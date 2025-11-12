@@ -1,0 +1,36 @@
+/* Custom styles for NTUST Health Task Map */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700&display=swap');
+
+body {
+  font-family: 'Noto Sans TC', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  background: #f7f9fc;
+  color: #212529;
+}
+.navbar-brand { font-weight:700; }
+
+.container-main {
+  margin-top: 1rem;
+}
+
+#map {
+  height: calc(100vh - 180px);
+  min-height: 420px;
+  border-radius: .5rem;
+  box-shadow: 0 6px 18px rgba(23,43,77,0.08);
+}
+
+.card { box-shadow: 0 4px 14px rgba(22,34,70,0.06); }
+
+.popup-content { max-width: 260px; }
+.popup-actions { margin-top: .5rem; display:flex; gap:.5rem; }
+
+.btn-unlock { background: #1976d2; color: #fff; border: none; }
+.btn-upgrade { background: #e53935; color: #fff; border: none; }
+
+/* ensure leaflet popups have proper font and wrap */
+.leaflet-popup-content-wrapper { font-family: 'Noto Sans TC', sans-serif; }
+.leaflet-container { background: #e9f0fb; }
+
+@media (max-width: 767px) {
+  #map { height: 50vh; }
+}
