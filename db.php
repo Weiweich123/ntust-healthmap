@@ -12,13 +12,13 @@ if (file_exists($configFile)) {
     // 使用環境變數作為後備方案（適用於 Wasmer、Docker 等容器環境）
     $env = getenv('DB_ENV') ?: 'tidb';
     $dbConfig = [
-        'host' => getenv('DB_HOST') ?: 'gateway01.ap-northeast-1.prod.aws.tidbcloud.com',
-        'port' => getenv('DB_PORT') ?: '4000',
-        'database' => getenv('DB_NAME') ?: 'ntust_healthmap',
-        'username' => getenv('DB_USER') ?: '',
-        'password' => getenv('DB_PASS') ?: '',
-        'use_ssl' => (getenv('DB_USE_SSL') === 'true') ?: true,
-        'ssl_ca' => getenv('DB_SSL_CA') ?: __DIR__ . '/isrgrootx1.pem',
+        'host' => getenv('DB_HOST') ?: getenv('TIDB_HOST') ?: 'gateway01.ap-northeast-1.prod.aws.tidbcloud.com',
+        'port' => getenv('DB_PORT') ?: getenv('TIDB_PORT') ?: '4000',
+        'database' => getenv('DB_NAME') ?: getenv('TIDB_DATABASE') ?: 'ntust_healthmap',
+        'username' => getenv('DB_USER') ?: getenv('TIDB_USER') ?: '',
+        'password' => getenv('DB_PASS') ?: getenv('TIDB_PASSWORD') ?: '',
+        'use_ssl' => (getenv('DB_USE_SSL') === 'true' || getenv('TIDB_USE_SSL') === 'true') ?: true,
+        'ssl_ca' => getenv('DB_SSL_CA') ?: getenv('TIDB_SSL_CA') ?: __DIR__ . '/isrgrootx1.pem',
     ];
 }
 
