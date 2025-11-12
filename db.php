@@ -40,11 +40,30 @@ try {
         PDO::ATTR_EMULATE_PREPARES => false,
     ];
 
-    // 如果是 TiDB，加上 SSL 設定
-    if (USE_SSL && isset($dbConfig['ssl_ca'])) {
-        $options[PDO::MYSQL_ATTR_SSL_CA] = $dbConfig['ssl_ca'];
-        $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
-    }    $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+    // 如果是 TiDB，嘗試加上 SSL 設定
+    if (USE_SSL) {
+        // 檢查 SSL CA 檔案是否存在
+        if (isset($dbConfig['ssl_ca']) && file_exists($dbConfig['ssl_ca'])) {
+            $options[PDO::MYSQL_ATTR_SSL_CA] = $dbConfig['ssl_ca'];
+            $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
+        } else {
+            // SSL CA 檔案不存在，嘗試不驗證憑證
+            $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+        }
+    }
+
+    try {
+        $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+    } catch (PDOException $sslError) {
+        // 如果 SSL 連線失敗，嘗試不使用 SSL 驗證
+        if (USE_SSL && strpos($sslError->getMessage(), 'SSL') !== false) {
+            $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+            unset($options[PDO::MYSQL_ATTR_SSL_CA]);
+            $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+        } else {
+            throw $sslError;
+        }
+    }
 
     // 顯示目前連線環境（開發時可以看到）
     if (DB_ENV === 'local') {
