@@ -40,19 +40,22 @@ try {
         PDO::ATTR_EMULATE_PREPARES => false,
     ];
 
-    // TiDB Cloud 必須使用 SSL
+    // TiDB Cloud 必須使用 SSL (PHP 7.4 相容方式)
     if (USE_SSL) {
+        // 方法 1: 使用 PDO 選項強制 SSL
+        $options[PDO::MYSQL_ATTR_SSL_KEY] = NULL;
+        $options[PDO::MYSQL_ATTR_SSL_CERT] = NULL;
+        $options[PDO::MYSQL_ATTR_SSL_CA] = NULL;
+        $options[PDO::MYSQL_ATTR_SSL_CAPATH] = NULL;
+        $options[PDO::MYSQL_ATTR_SSL_CIPHER] = NULL;
+
         // 檢查 SSL CA 檔案是否存在
         if (isset($dbConfig['ssl_ca']) && file_exists($dbConfig['ssl_ca'])) {
-            // 使用指定的 CA 憑證
             $options[PDO::MYSQL_ATTR_SSL_CA] = $dbConfig['ssl_ca'];
-            $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
-        } else {
-            // 沒有 CA 檔案時，啟用 SSL 但不驗證憑證（適用於 Wasmer 等環境）
-            $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
-            // 在 DSN 中明確要求 SSL
-            $dsn .= ';ssl-mode=REQUIRED';
         }
+
+        // 不驗證伺服器憑證但啟用 SSL
+        $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
     }
 
     $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);

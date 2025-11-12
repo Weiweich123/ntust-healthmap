@@ -1,8 +1,9 @@
 # 資料庫配置檔案（包含敏感資訊）
 config.php
 
-# SSL 憑證
+# SSL 憑證（排除根憑證，因為是公開的）
 *.pem
+!isrgrootx1.pem
 
 # IDE 設定檔
 .vscode/
