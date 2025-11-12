@@ -145,6 +145,18 @@ try {
             public function lastInsertId() {
                 return $this->mysqli->insert_id;
             }
+
+            public function beginTransaction() {
+                return $this->mysqli->begin_transaction();
+            }
+
+            public function commit() {
+                return $this->mysqli->commit();
+            }
+
+            public function rollBack() {
+                return $this->mysqli->rollback();
+            }
         };
 
     } else {
