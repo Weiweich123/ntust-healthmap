@@ -112,6 +112,13 @@ try {
                     public function rowCount() {
                         return $this->stmt->affected_rows;
                     }
+
+                    public function fetchColumn($column = 0) {
+                        $result = $this->stmt->get_result();
+                        if (!$result) return false;
+                        $row = $result->fetch_row();
+                        return $row ? $row[$column] : false;
+                    }
                 };
             }
 
@@ -139,6 +146,10 @@ try {
                     public function fetchAll($mode = PDO::FETCH_ASSOC) {
                         return $this->result->fetch_all(MYSQLI_ASSOC);
                     }
+                    public function fetchColumn($column = 0) {
+                        $row = $this->result->fetch_row();
+                        return $row ? $row[$column] : false;
+                    }
                 };
             }
 
@@ -156,6 +167,16 @@ try {
 
             public function rollBack() {
                 return $this->mysqli->rollback();
+            }
+
+            public function inTransaction() {
+                // MySQLi 沒有直接方法，用查詢檢查
+                $result = $this->mysqli->query("SELECT @@in_transaction");
+                if ($result) {
+                    $row = $result->fetch_row();
+                    return $row && $row[0] == 1;
+                }
+                return false;
             }
         };
 
