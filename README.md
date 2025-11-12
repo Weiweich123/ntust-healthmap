@@ -29,7 +29,7 @@
    ```bash
    cp config.example.php config.php
    ```
-   
+
    編輯 `config.php`，填入你的資料庫資訊：
    - 本地開發：使用 `local` 環境設定
    - 線上部署：使用 `tidb` 環境設定
@@ -53,10 +53,10 @@
 
 ## 功能特色
 
-✅ 使用 PDO + prepared statements 避免 SQL 注入  
-✅ 使用 `password_hash` / `password_verify` 安全儲存密碼  
-✅ 支援本地和雲端資料庫切換  
-✅ 響應式設計，支援手機瀏覽  
+✅ 使用 PDO + prepared statements 避免 SQL 注入
+✅ 使用 `password_hash` / `password_verify` 安全儲存密碼
+✅ 支援本地和雲端資料庫切換
+✅ 響應式設計，支援手機瀏覽
 
 ## 安全性說明
 

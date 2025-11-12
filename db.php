@@ -2,10 +2,25 @@
 // db.php - PDO connection
 session_start();
 
-// 載入配置檔案
-$config = require __DIR__ . '/config.php';
-$env = $config['environment'];
-$dbConfig = $config[$env];
+// 載入配置檔案（如果存在）
+$configFile = __DIR__ . '/config.php';
+if (file_exists($configFile)) {
+    $config = require $configFile;
+    $env = $config['environment'];
+    $dbConfig = $config[$env];
+} else {
+    // 使用環境變數作為後備方案（適用於 Wasmer、Docker 等容器環境）
+    $env = getenv('DB_ENV') ?: 'tidb';
+    $dbConfig = [
+        'host' => getenv('DB_HOST') ?: 'gateway01.ap-northeast-1.prod.aws.tidbcloud.com',
+        'port' => getenv('DB_PORT') ?: '4000',
+        'database' => getenv('DB_NAME') ?: 'ntust_healthmap',
+        'username' => getenv('DB_USER') ?: '',
+        'password' => getenv('DB_PASS') ?: '',
+        'use_ssl' => (getenv('DB_USE_SSL') === 'true') ?: true,
+        'ssl_ca' => getenv('DB_SSL_CA') ?: __DIR__ . '/isrgrootx1.pem',
+    ];
+}
 
 // 設定資料庫常數
 define('DB_HOST', $dbConfig['host']);
