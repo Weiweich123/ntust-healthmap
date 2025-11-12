@@ -69,6 +69,7 @@ try {
         // 建立 PDO 相容的包裝器
         $pdo = new class($mysqli) {
             private $mysqli;
+            private $inTransaction = false;
 
             public function __construct($mysqli) {
                 $this->mysqli = $mysqli;
@@ -158,25 +159,22 @@ try {
             }
 
             public function beginTransaction() {
+                $this->inTransaction = true;
                 return $this->mysqli->begin_transaction();
             }
 
             public function commit() {
+                $this->inTransaction = false;
                 return $this->mysqli->commit();
             }
 
             public function rollBack() {
+                $this->inTransaction = false;
                 return $this->mysqli->rollback();
             }
 
             public function inTransaction() {
-                // MySQLi 沒有直接方法，用查詢檢查
-                $result = $this->mysqli->query("SELECT @@in_transaction");
-                if ($result) {
-                    $row = $result->fetch_row();
-                    return $row && $row[0] == 1;
-                }
-                return false;
+                return $this->inTransaction;
             }
         };
 

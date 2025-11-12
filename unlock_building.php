@@ -44,6 +44,22 @@ try {
     $u2 = $stmt->fetch();
     header('Content-Type: application/json'); echo json_encode(['success'=>true,'message'=>'解鎖成功','level'=>1,'points'=>$u2['points'],'money'=>$u2['money']]); exit;
 } catch (Exception $e) {
-    if ($pdo->inTransaction()) $pdo->rollBack();
-    header('Content-Type: application/json'); echo json_encode(['success'=>false,'message'=>$e->getMessage()]); exit;
+    // 確保回滾交易
+    try {
+        if (method_exists($pdo, 'inTransaction') && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+    } catch (Exception $rollbackError) {
+        // 忽略回滾錯誤
+    }
+
+    // 記錄錯誤（開發用）
+    error_log('unlock_building error: ' . $e->getMessage());
+
+    header('Content-Type: application/json');
+    echo json_encode([
+        'success' => false,
+        'message' => $e->getMessage()
+    ]);
+    exit;
 }
