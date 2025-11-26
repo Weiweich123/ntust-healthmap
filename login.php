@@ -30,47 +30,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>登入 - 台科大健康任務地圖</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <link href="assets/styles.css" rel="stylesheet">
 </head>
-<body>
-  <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
-    <div class="container">
-      <a class="navbar-brand" href="index.php">台科大健康任務地圖</a>
-      <div class="collapse navbar-collapse">
-        <ul class="navbar-nav ms-auto">
-          <li class="nav-item"><a class="nav-link" href="register.php">註冊</a></li>
-        </ul>
-      </div>
+<body class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <i class="fas fa-heartbeat"></i>
     </div>
-  </nav>
+    <h1 class="auth-title">歡迎回來</h1>
+    <p class="auth-subtitle">登入以繼續您的健康任務</p>
 
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-md-5">
-        <div class="card shadow-sm">
-          <div class="card-body">
-            <h3 class="card-title mb-3">登入</h3>
-            <?php if ($error): ?>
-              <div class="alert alert-danger" role="alert"><?php echo htmlspecialchars($error); ?></div>
-            <?php endif; ?>
-            <form method="post">
-              <div class="mb-3">
-                <label class="form-label">帳號</label>
-                <input name="username" class="form-control" required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">密碼</label>
-                <input name="password" type="password" class="form-control" required>
-              </div>
-              <div class="d-grid">
-                <button type="submit" class="btn btn-primary">登入</button>
-              </div>
-            </form>
-            <hr>
-            <p class="mb-0">沒有帳號？ <a href="register.php">註冊</a></p>
-          </div>
-        </div>
+    <?php if ($error): ?>
+      <div class="alert alert-danger" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i><?php echo htmlspecialchars($error); ?>
       </div>
+    <?php endif; ?>
+
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">帳號</label>
+        <input name="username" class="form-control" placeholder="請輸入帳號" required>
+      </div>
+      <div class="mb-4">
+        <label class="form-label">密碼</label>
+        <input name="password" type="password" class="form-control" placeholder="請輸入密碼" required>
+      </div>
+      <div class="d-grid">
+        <button type="submit" class="btn btn-primary btn-lg">
+          <i class="fas fa-sign-in-alt me-2"></i>登入
+        </button>
+      </div>
+    </form>
+
+    <div class="auth-footer">
+      <span class="text-muted">還沒有帳號？</span>
+      <a href="register.php">立即註冊</a>
     </div>
   </div>
 

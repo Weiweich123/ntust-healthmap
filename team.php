@@ -59,41 +59,64 @@ if ($team) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>我的團隊 - 台科大健康任務地圖</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <link href="assets/styles.css" rel="stylesheet">
 </head>
 <body>
-  <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+  <nav class="navbar navbar-expand-lg">
     <div class="container">
-      <a class="navbar-brand" href="index.php">台科大健康任務地圖</a>
-      <div class="collapse navbar-collapse">
-        <ul class="navbar-nav ms-auto">
-          <li class="nav-item"><a class="nav-link" href="create_team.php">建立團隊</a></li>
-          <li class="nav-item"><a class="nav-link" href="join_team.php">加入團隊</a></li>
-        </ul>
+      <a class="navbar-brand" href="index.php">
+        <i class="fas fa-heartbeat me-2"></i>台科大健康任務地圖
+      </a>
+      <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-primary btn-sm" href="create_team.php">
+          <i class="fas fa-plus me-1"></i>建立
+        </a>
+        <a class="btn btn-outline-success btn-sm" href="join_team.php">
+          <i class="fas fa-sign-in-alt me-1"></i>加入
+        </a>
+        <a class="btn btn-outline-secondary btn-sm" href="index.php">
+          <i class="fas fa-arrow-left"></i>
+        </a>
       </div>
     </div>
   </nav>
 
-  <div class="container">
+  <div class="container container-main">
     <div class="row justify-content-center">
-      <div class="col-lg-8">
-        <div class="card shadow-sm">
+      <div class="col-lg-10">
+        <div class="card">
           <div class="card-body">
-            <h3 class="card-title mb-3">我的團隊</h3>
+            <h3 class="card-title">
+              <i class="fas fa-users"></i>我的團隊
+            </h3>
 
             <?php if (!$team): ?>
-              <div class="alert alert-secondary">您目前尚未加入任何團隊。</div>
+              <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>您目前尚未加入任何團隊
+              </div>
               <div class="d-flex gap-2">
-                <a class="btn btn-success" href="create_team.php">建立團隊</a>
-                <a class="btn btn-primary" href="join_team.php">加入團隊</a>
+                <a class="btn btn-success" href="create_team.php">
+                  <i class="fas fa-plus-circle me-2"></i>建立團隊
+                </a>
+                <a class="btn btn-primary" href="join_team.php">
+                  <i class="fas fa-sign-in-alt me-2"></i>加入團隊
+                </a>
               </div>
             <?php else: ?>
-              <div class="mb-3">
-                <h5 class="mb-1"><?php echo htmlspecialchars($team['name']); ?></h5>
-                <small class="text-muted">邀請碼: <?php echo htmlspecialchars($team['code']); ?></small>
+              <div class="mb-4 p-3" style="background: linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%); border-radius: var(--radius-md); border-left: 4px solid var(--primary);">
+                <h5 class="mb-2">
+                  <i class="fas fa-flag me-2"></i><?php echo htmlspecialchars($team['name']); ?>
+                </h5>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="text-muted"><i class="fas fa-key me-1"></i>邀請碼：</span>
+                  <code class="px-2 py-1" style="background: white; border-radius: 6px; font-weight: 600; color: var(--primary);"><?php echo htmlspecialchars($team['code']); ?></code>
+                </div>
               </div>
 
-              <h6 class="mt-3">成員</h6>
+              <h6 class="mt-4 mb-3">
+                <i class="fas fa-user-friends me-2"></i>成員列表
+              </h6>
               <div class="table-responsive mb-3">
                 <table class="table table-sm align-middle">
                   <thead>
@@ -113,17 +136,26 @@ if ($team) {
                 </table>
               </div>
 
-              <h6 class="mt-3">團隊任務（保持三個任務）</h6>
+              <h6 class="mt-4 mb-3">
+                <i class="fas fa-tasks me-2"></i>團隊任務
+                <span class="badge bg-primary ms-2">3個任務</span>
+              </h6>
               <div id="team-tasks" class="row row-cols-1 row-cols-md-3 g-3">
                 <?php foreach($tasks as $t): ?>
                   <?php $task_key = $t['team_id'] . '|' . rawurlencode($t['created_at']); ?>
                   <div class="col" id="task-card-<?php echo htmlspecialchars($task_key); ?>">
-                    <div class="card h-100">
+                    <div class="card h-100" style="border-left: 4px solid var(--primary);">
                       <div class="card-body d-flex flex-column">
-                        <h6 class="card-title mb-2"><?php echo htmlspecialchars($t['title']); ?></h6>
-                        <p class="mb-2 text-muted">獎勵：<?php echo (int)$t['points']; ?> 點</p>
+                        <h6 class="card-title mb-2">
+                          <i class="fas fa-clipboard-check me-2"></i><?php echo htmlspecialchars($t['title']); ?>
+                        </h6>
+                        <p class="mb-3 text-muted">
+                          <i class="fas fa-trophy me-1"></i>獎勵：<strong><?php echo (int)$t['points']; ?></strong> 點
+                        </p>
                         <div class="mt-auto">
-                          <button data-team-id="<?php echo (int)$t['team_id']; ?>" data-created-at="<?php echo htmlspecialchars($t['created_at']); ?>" class="btn btn-sm btn-outline-success btn-complete">完成任務</button>
+                          <button data-team-id="<?php echo (int)$t['team_id']; ?>" data-created-at="<?php echo htmlspecialchars($t['created_at']); ?>" class="btn btn-sm btn-primary btn-complete w-100">
+                            <i class="fas fa-check-circle me-1"></i>完成
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -132,8 +164,12 @@ if ($team) {
               </div>
             <?php endif; ?>
 
-            <hr>
-            <p class="mb-0"><a href="index.php">回首頁</a></p>
+            <hr class="my-4">
+            <div class="text-center">
+              <a href="index.php" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>返回首頁
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -164,12 +200,18 @@ if ($team) {
                 col.className = 'col';
                 col.id = 'task-card-' + newKey;
                 col.innerHTML = `
-                  <div class="card h-100">
+                  <div class="card h-100" style="border-left: 4px solid var(--primary);">
                     <div class="card-body d-flex flex-column">
-                      <h6 class="card-title mb-2">${escapeHtml(nt.title)}</h6>
-                      <p class="mb-2 text-muted">獎勵：${nt.points} 點</p>
+                      <h6 class="card-title mb-2">
+                        <i class="fas fa-clipboard-check me-2"></i>${escapeHtml(nt.title)}
+                      </h6>
+                      <p class="mb-3 text-muted">
+                        <i class="fas fa-trophy me-1"></i>獎勵：<strong>${nt.points}</strong> 點
+                      </p>
                       <div class="mt-auto">
-                        <button data-team-id="${nt.team_id}" data-created-at="${nt.created_at}" class="btn btn-sm btn-outline-success btn-complete">完成任務</button>
+                        <button data-team-id="${nt.team_id}" data-created-at="${nt.created_at}" class="btn btn-sm btn-primary btn-complete w-100">
+                          <i class="fas fa-check-circle me-1"></i>完成
+                        </button>
                       </div>
                     </div>
                   </div>
