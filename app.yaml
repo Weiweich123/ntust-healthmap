@@ -1,0 +1,35 @@
+kind: wasmer.io/App.v0
+name: ntust-healthmap
+package: php/php
+description: NTUST Health Task Map - 台科大健康任務地圖
+debug: true
+
+cli_args:
+  - php-cgi
+  - -S
+  - 0.0.0.0:8080
+  - -t
+  - /app
+
+env:
+  # PHP settings
+  PHP_DISPLAY_ERRORS: "0"
+  PHP_ERROR_REPORTING: "E_ALL & ~E_DEPRECATED & ~E_STRICT"
+  
+  # Debug mode - 設為 true 可以看到詳細錯誤訊息
+  DEBUG: "true"
+  APP_ENV: "development"
+
+  # Application environment (set these in Wasmer Secrets)
+  # TIDB_HOST: ""
+  # TIDB_PORT: "4000"
+  # TIDB_DATABASE: ""
+  # TIDB_USER: ""
+  # TIDB_PASSWORD: ""
+  # TIDB_USE_SSL: "true"
+
+scaling:
+  mode: single_concurrency
+
+fs:
+  "/app": .
