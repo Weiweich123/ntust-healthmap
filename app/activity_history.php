@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             // 驗證所有 ID 都是數字
             $safe_ids = array_map('intval', $ids);
             $placeholders = implode(',', array_fill(0, count($safe_ids), '?'));
-            
+
             // 只刪除屬於當前用戶的記錄
             $stmt = $pdo->prepare("DELETE FROM activities WHERE activity_id IN ($placeholders) AND user_id = ?");
             $params = array_merge($safe_ids, [$user_id]);
@@ -27,15 +27,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $steps = (int)($_POST['steps'] ?? 0);
         $time_minutes = (int)($_POST['time_minutes'] ?? 0);
         $water_ml = (int)($_POST['water_ml'] ?? 0);
-        
+
         if ($activity_id > 0 && $activity_date) {
             $stmt = $pdo->prepare('UPDATE activities SET activity_date = ?, steps = ?, time_minutes = ?, water_ml = ? WHERE activity_id = ? AND user_id = ?');
             $stmt->execute([$activity_date, $steps, $time_minutes, $water_ml, $activity_id, $user_id]);
             if ($stmt->rowCount() > 0) {
                 // 修改成功後重導向，避免停留在編輯頁面
+                $post_filter_year = $_POST['filter_year'] ?? '';
+                $post_filter_month = $_POST['filter_month'] ?? '';
+                $post_filter_day = $_POST['filter_day'] ?? '';
                 $redirect_url = 'activity_history.php?updated=1';
-                if ($filter_year !== '' || $filter_month !== '' || $filter_day !== '') {
-                    $redirect_url = 'activity_history.php?updated=1&year=' . urlencode($_POST['filter_year'] ?? '') . '&month=' . urlencode($_POST['filter_month'] ?? '') . '&day=' . urlencode($_POST['filter_day'] ?? '');
+                if ($post_filter_year !== '' || $post_filter_month !== '' || $post_filter_day !== '') {
+                    $redirect_url = 'activity_history.php?updated=1&year=' . urlencode($post_filter_year) . '&month=' . urlencode($post_filter_month) . '&day=' . urlencode($post_filter_day);
                 }
                 header('Location: ' . $redirect_url);
                 exit;
