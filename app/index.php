@@ -8,19 +8,6 @@ $stmt = $pdo->prepare('SELECT user_id, username, display_name, points, money FRO
 $stmt->execute([$user_id]);
 $user = $stmt->fetch();
 
-// If the user row cannot be found (stale session), clear session and force login
-if (!$user) {
-  session_unset();
-  session_destroy();
-  header('Location: login.php');
-  exit;
-}
-
-// safe display values for templates
-$display_name = htmlspecialchars($user['display_name'] ?? $user['username'] ?? '訪客', ENT_QUOTES, 'UTF-8');
-$points = isset($user['points']) ? (int)$user['points'] : 0;
-$money = isset($user['money']) ? (int)$user['money'] : 0;
-
 // get user's unlocked buildings and levels
 $stmt = $pdo->prepare('SELECT ub.building_id, ub.level, b.name FROM user_buildings ub JOIN buildings b ON ub.building_id=b.building_id WHERE ub.user_id = ?');
 $stmt->execute([$user_id]);
@@ -56,14 +43,17 @@ foreach ($user_buildings as $bid => $info) {
       <div class="d-flex align-items-center gap-3">
         <div class="d-none d-md-block">
           <i class="fas fa-user-circle me-1 text-muted"></i>
-          <strong><?php echo $display_name; ?></strong>
+          <strong><?php echo htmlspecialchars($user['display_name'] ?? $user['username']); ?></strong>
         </div>
         <span class="badge bg-primary">
-          <i class="fas fa-star me-1"></i><?php echo $points; ?> 點
+          <i class="fas fa-star me-1"></i><?php echo (int)$user['points']; ?> 點
         </span>
         <span class="badge bg-success">
-          <i class="fas fa-coins me-1"></i><?php echo $money; ?> 元
+          <i class="fas fa-coins me-1"></i><?php echo (int)$user['money']; ?> 元
         </span>
+        <a class="btn btn-outline-info btn-sm" href="friends.php" title="好友列表">
+          <i class="fas fa-user-friends"></i>
+        </a>
         <a class="btn btn-outline-secondary btn-sm" href="logout.php">
           <i class="fas fa-sign-out-alt"></i>
         </a>
@@ -81,6 +71,10 @@ foreach ($user_buildings as $bid => $info) {
             </h5>
             <form id="activityForm" method="post" action="submit_activity.php">
               <div class="mb-3">
+                <label class="form-label">日期</label>
+                <input name="activity_date" type="date" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
+              </div>
+              <div class="mb-3">
                 <label class="form-label">步數</label>
                 <input name="steps" type="number" min="0" class="form-control" placeholder="今日步數" required>
               </div>
@@ -92,16 +86,19 @@ foreach ($user_buildings as $bid => $info) {
                 <label class="form-label">喝水 (毫升)</label>
                 <input name="water_ml" type="number" min="0" class="form-control" placeholder="飲水量" required>
               </div>
-              <div class="d-grid">
+              <div class="d-grid gap-2">
                 <button type="submit" class="btn btn-primary">
                   <i class="fas fa-paper-plane me-2"></i>提交紀錄
                 </button>
+                <a href="activity_history.php" class="btn btn-outline-secondary">
+                  <i class="fas fa-history me-2"></i>查詢運動歷程
+                </a>
               </div>
             </form>
           </div>
         </div>
 
-        <div class="card mb-4">
+        <div class="card">
           <div class="card-body">
             <h5 class="card-title">
               <i class="fas fa-users"></i>團隊系統
@@ -120,24 +117,23 @@ foreach ($user_buildings as $bid => $info) {
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="card">
-          <div class="card-body">
-            <h6 class="card-title mb-3">
-              <i class="fas fa-lightbulb"></i>使用提示
-            </h6>
-            <p class="small text-muted mb-2">
+      <div class="col-lg-8 d-flex flex-column">
+        <div id="map" class="mb-4"></div>
+        <div class="card flex-grow-1">
+          <div class="card-body d-flex flex-column justify-content-center align-items-center text-center">
+            <h2 class="mb-4">
+              <i class="fas fa-lightbulb me-2" style="color: var(--primary);"></i>使用提示
+            </h2>
+            <p class="text-muted mb-2 fs-5">
               <i class="fas fa-info-circle me-2"></i>活動提交僅會增加點數，金錢需透過升級建築獲得
             </p>
-            <p class="small text-muted mb-0">
+            <p class="text-muted mb-0 fs-5">
               <i class="fas fa-map-marker-alt me-2"></i>地圖上藍色標記為未解鎖，紅色為已解鎖建築
             </p>
           </div>
         </div>
-      </div>
-
-      <div class="col-lg-8">
-        <div id="map"></div>
       </div>
     </div>
   </div>
@@ -151,55 +147,43 @@ foreach ($user_buildings as $bid => $info) {
     const userBuildings = <?php echo json_encode($ub_levels, JSON_HEX_TAG); ?>;
     const blueIcon = L.icon({
       iconUrl: 'icons/blue-pin.svg',
-      iconSize: [32,42],
-      iconAnchor: [16,42],
-      popupAnchor: [0,-40]
+      iconSize: [28,38],
+      iconAnchor: [14,38],
+      popupAnchor: [0,-35]
     });
     const redIcon = L.icon({
       iconUrl: 'icons/red-pin.svg',
-      iconSize: [32,42],
-      iconAnchor: [16,42],
-      popupAnchor: [0,-40]
+      iconSize: [28,38],
+      iconAnchor: [14,38],
+      popupAnchor: [0,-35]
     });
-
-    function showNotification(message, type = 'info') {
-      const notification = document.createElement('div');
-      notification.className = `alert alert-${type} position-fixed top-0 start-50 translate-middle-x mt-3`;
-      notification.style.cssText = 'z-index: 9999; min-width: 300px; animation: fadeInUp 0.3s ease-out;';
-      notification.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'info-circle'} me-2"></i>${message}`;
-      document.body.appendChild(notification);
-      setTimeout(() => {
-        notification.style.animation = 'fadeOut 0.3s ease-out';
-        setTimeout(() => notification.remove(), 300);
-      }, 3000);
-    }
 
     function makePopupHtml(b, unlockedLevel){
       let html = `<div class="popup-content">`;
-      html += `<h6 class="mb-2"><i class="fas fa-building me-2"></i>${b.name}</h6>`;
-      html += `<div class="text-muted small mb-2">${b.description}</div>`;
+      html += `<h6 class="mb-1">${b.name}</h6>`;
+      html += `<div class="text-muted small">${b.description}</div>`;
       if (unlockedLevel > 0) {
         const upgradeCost = (b.unlock_cost || 1) * (unlockedLevel + 1);
         const upgradeReward = Math.floor(upgradeCost / 2);
-        html += `<hr class="my-2">`;
-        html += `<div class="mb-1"><i class="fas fa-level-up-alt me-2"></i>等級: <strong>${unlockedLevel}</strong></div>`;
-        html += `<div class="mb-1"><i class="fas fa-star me-2"></i>升級所需: <strong>${upgradeCost}</strong> 點</div>`;
-        html += `<div class="mb-2"><i class="fas fa-coins me-2"></i>升級獲得: <strong>${upgradeReward}</strong> 元</div>`;
+        html += `<hr>`;
+        html += `<div>等級: <strong>${unlockedLevel}</strong></div>`;
+        html += `<div>升級所需點數: <strong>${upgradeCost}</strong></div>`;
+        html += `<div>升級可得金錢: <strong>${upgradeReward}</strong></div>`;
         if (unlockedLevel < 9) {
-          html += `<div class="popup-actions"><button class="btn btn-sm btn-upgrade" onclick="upgrade(${b.id})"><i class="fas fa-arrow-up me-1"></i>升級</button></div>`;
+          html += `<div class="popup-actions"><button class="btn btn-sm btn-upgrade" onclick="upgrade(${b.id})">升級</button></div>`;
         } else {
-          html += `<div class="mt-2 text-success"><i class="fas fa-trophy me-1"></i>已達最高等級</div>`;
+          html += `<div class="mt-2 text-success">已達最高等級</div>`;
         }
       } else {
-        html += `<hr class="my-2">`;
-        html += `<div class="mb-2"><i class="fas fa-lock me-2"></i>解鎖成本: <strong>${b.unlock_cost}</strong> 點</div>`;
-        html += `<div class="popup-actions"><button class="btn btn-sm btn-unlock" onclick="unlock(${b.id})"><i class="fas fa-unlock me-1"></i>解鎖</button></div>`;
+        html += `<hr>`;
+        html += `<div>解鎖成本: <strong>${b.unlock_cost}</strong> 點</div>`;
+        html += `<div class="popup-actions"><button class="btn btn-sm btn-unlock" onclick="unlock(${b.id})">解鎖</button></div>`;
       }
       html += `</div>`;
       return html;
     }
 
-    fetch('buildings.json').then(r=>r.json()).then(buildings=>{
+  fetch('buildings.json').then(r=>r.json()).then(buildings=>{
       buildings.forEach(b=>{
         const unlockedLevel = userBuildings[b.id] || 0;
         const icon = unlockedLevel > 0 ? redIcon : blueIcon;
@@ -210,29 +194,24 @@ foreach ($user_buildings as $bid => $info) {
 
     function unlock(bid){
       fetch('unlock_building.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({building_id:bid})})
-      .then(r=>r.json()).then(j=>{
-        if (j.success) {
-          showNotification(j.message, 'success');
-          setTimeout(() => location.reload(), 1500);
+      .then(r=>r.json()).then(j=>{ if (j.success) {
+          // nicer notification using bootstrap modal/alert might be added later
+          alert(j.message);
+          location.reload();
         } else {
-          showNotification('錯誤: ' + j.message, 'danger');
+          alert('錯誤: ' + j.message);
         }
-      }).catch(err => {
-        showNotification('網路錯誤，請稍後再試', 'danger');
       });
     }
 
     function upgrade(bid){
       fetch('upgrade_building.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({building_id:bid})})
-      .then(r=>r.json()).then(j=>{
-        if (j.success) {
-          showNotification(j.message, 'success');
-          setTimeout(() => location.reload(), 1500);
+      .then(r=>r.json()).then(j=>{ if (j.success) {
+          alert(j.message);
+          location.reload();
         } else {
-          showNotification('錯誤: ' + j.message, 'danger');
+          alert('錯誤: ' + j.message);
         }
-      }).catch(err => {
-        showNotification('網路錯誤，請稍後再試', 'danger');
       });
     }
   </script>

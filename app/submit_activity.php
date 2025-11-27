@@ -7,9 +7,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $user_id = $_SESSION['user_id'];
+$activity_date = $_POST['activity_date'] ?? date('Y-m-d');
 $steps = (int)($_POST['steps'] ?? 0);
 $time_minutes = (int)($_POST['time_minutes'] ?? 0);
 $water_ml = (int)($_POST['water_ml'] ?? 0);
+
+// 驗證日期格式
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $activity_date)) {
+    $activity_date = date('Y-m-d');
+}
 
 // Simple points formula (you can tune these):
 // 每1000步 = 2 點; 每30分鐘運動 = 3 點; 每500ml水 = 1 點
@@ -22,12 +28,9 @@ $water_ml = (int)($_POST['water_ml'] ?? 0);
 
 try {
     $pdo->beginTransaction();
-    // Insert a new activity record every time the user submits.
-    // Previously the table used a composite PK (user_id, activity_date) and the code
-    // updated the existing row. We now record multiple submissions per user.
-    $today = date('Y-m-d');
-    $stmt = $pdo->prepare('INSERT INTO activities (user_id,activity_date,steps,time_minutes,water_ml,points_earned,money_earned) VALUES (?,?,?,?,?,?,?)');
-    $stmt->execute([$user_id,$today,$steps,$time_minutes,$water_ml,$points,$money]);
+    // Always insert a new activity record (keep history)
+    $stmt = $pdo->prepare('INSERT INTO activities (user_id, activity_date, steps, time_minutes, water_ml, points_earned, money_earned, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())');
+    $stmt->execute([$user_id, $activity_date, $steps, $time_minutes, $water_ml, $points, $money]);
 
     // add to user's points total only (money not awarded via activity submissions)
     $stmt = $pdo->prepare('UPDATE users SET points = points + ? WHERE user_id = ?');

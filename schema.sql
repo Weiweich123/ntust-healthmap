@@ -57,10 +57,9 @@ CREATE TABLE IF NOT EXISTS `activities` (
   `water_ml` INT DEFAULT 0,
   `points_earned` INT DEFAULT 0,
   `money_earned` INT DEFAULT 0,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `created_at` DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
   CONSTRAINT `fk_act_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`user_id`) ON DELETE CASCADE,
-  INDEX (`user_id`),
-  INDEX (`activity_date`)
+  KEY `idx_user_date` (`user_id`,`activity_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `team_tasks` (
@@ -95,3 +94,55 @@ INSERT INTO `buildings` (`building_id`,`name`,`lat`,`lng`,`description`,`unlock_
 ON DUPLICATE KEY UPDATE name=VALUES(name), lat=VALUES(lat), lng=VALUES(lng), description=VALUES(description), unlock_cost=VALUES(unlock_cost), reward_money=VALUES(reward_money);
 -- remove unwanted buildings requested by user (if present)
 DELETE FROM buildings WHERE building_id IN (16,18,19,20);
+
+-- ============================================================================
+-- 好友系統資料表
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `friendships` (
+  `friendship_id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `friend_id` INT NOT NULL,
+  `status` ENUM('pending','accepted','rejected') DEFAULT 'pending',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `unique_friendship` (`user_id`, `friend_id`),
+  CONSTRAINT `fk_fr_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`user_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_fr_friend` FOREIGN KEY (`friend_id`) REFERENCES `users`(`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- MIGRATION INSTRUCTIONS: Run these commands in phpMyAdmin SQL tab to migrate existing DB
+-- (Remove the -- comments before each line to execute, or copy the uncommented version below)
+-- ============================================================================
+--
+-- STEP 1: Backup your current activities table (recommended)
+-- CREATE TABLE activities_backup AS SELECT * FROM activities;
+--
+-- STEP 2: Create new table with activity_id primary key
+-- CREATE TABLE activities_new (
+--   activity_id INT AUTO_INCREMENT PRIMARY KEY,
+--   user_id INT NOT NULL,
+--   activity_date DATE NOT NULL,
+--   steps INT DEFAULT 0,
+--   time_minutes INT DEFAULT 0,
+--   water_ml INT DEFAULT 0,
+--   points_earned INT DEFAULT 0,
+--   money_earned INT DEFAULT 0,
+--   created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
+--   KEY idx_user_date (user_id, activity_date),
+--   CONSTRAINT fk_act_user_new FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+-- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+--
+-- STEP 3: Copy all data from old table to new table
+-- INSERT INTO activities_new (user_id, activity_date, steps, time_minutes, water_ml, points_earned, money_earned, created_at)
+-- SELECT user_id, activity_date, steps, time_minutes, water_ml, points_earned, money_earned, created_at FROM activities;
+--
+-- STEP 4: Verify record counts match
+-- SELECT COUNT(*) AS old_count FROM activities;
+-- SELECT COUNT(*) AS new_count FROM activities_new;
+--
+-- STEP 5: If counts match, swap the tables
+-- RENAME TABLE activities TO activities_old, activities_new TO activities;
+--
+-- STEP 6: (Optional) After verifying everything works, drop old table
+-- DROP TABLE activities_old;
+-- DROP TABLE activities_backup;
