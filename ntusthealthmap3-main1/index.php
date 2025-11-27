@@ -67,7 +67,7 @@ foreach ($user_buildings as $bid => $info) {
         <div class="card mb-4">
           <div class="card-body">
             <h5 class="card-title">
-              <i class="fas fa-running"></i>提交運動數據
+              <i class="fas fa-running"></i>提交今日運動
             </h5>
             <form id="activityForm" method="post" action="submit_activity.php">
               <div class="mb-3">
