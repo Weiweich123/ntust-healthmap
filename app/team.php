@@ -3,54 +3,99 @@ require_once __DIR__ . '/db.php';
 require_login();
 
 $user_id = $_SESSION['user_id'];
-// get user's team
-$stmt = $pdo->prepare('SELECT t.team_id AS id,t.name,t.code FROM teams t JOIN team_members tm ON t.team_id=tm.team_id WHERE tm.user_id=? LIMIT 1');
-$stmt->execute([$user_id]);
-$team = $stmt->fetch();
+$message = '';
+$error = '';
 
-// list members
-$members = [];
-if ($team) {
-  $stmt = $pdo->prepare('SELECT u.user_id AS id,u.username,u.display_name,tm.role FROM team_members tm JOIN users u ON tm.user_id=u.user_id WHERE tm.team_id=?');
-  $stmt->execute([$team['id']]);
-    $members = $stmt->fetchAll();
+// 處理退出/踢出團隊請求
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    if ($_POST['action'] === 'leave_team') {
+        $team_id = (int)($_POST['team_id'] ?? 0);
+        // 檢查自己是否在此團隊
+        $stmt = $pdo->prepare('SELECT role FROM team_members WHERE team_id = ? AND user_id = ?');
+        $stmt->execute([$team_id, $user_id]);
+        $membership = $stmt->fetch();
+        if ($membership) {
+            // 刪除自己
+            $stmt = $pdo->prepare('DELETE FROM team_members WHERE team_id = ? AND user_id = ?');
+            $stmt->execute([$team_id, $user_id]);
+            $message = '已退出團隊';
+        }
+    } elseif ($_POST['action'] === 'kick_member') {
+        $team_id = (int)($_POST['team_id'] ?? 0);
+        $member_id = (int)($_POST['member_id'] ?? 0);
+        // 檢查自己是否是 owner
+        $stmt = $pdo->prepare('SELECT role FROM team_members WHERE team_id = ? AND user_id = ?');
+        $stmt->execute([$team_id, $user_id]);
+        $my_role = $stmt->fetch();
+        if ($my_role && $my_role['role'] === 'owner') {
+            // 不能踢自己
+            if ($member_id != $user_id) {
+                $stmt = $pdo->prepare('DELETE FROM team_members WHERE team_id = ? AND user_id = ?');
+                $stmt->execute([$team_id, $member_id]);
+                $message = '已將成員移出團隊';
+            }
+        } else {
+            $error = '只有團隊擁有者可以移除成員';
+        }
+    }
 }
 
-// ensure each team has 3 active random tasks visible
-if ($team) {
-  // helper pool
-  $taskPool = [
-    ['title'=>'團隊步行 5000 步','points'=>10],
-    ['title'=>'一起喝 8 杯水','points'=>8],
-    ['title'=>'團體做 20 分鐘伸展','points'=>12],
-    ['title'=>'完成 30 分鐘有氧運動','points'=>15],
-    ['title'=>'共同完成 10000 步（分攤）','points'=>18],
-    ['title'=>'早睡 8 小時一次','points'=>8],
-    ['title'=>'完成 10 次深蹲','points'=>7],
-    ['title'=>'完成 15 分鐘核心訓練','points'=>9],
-    ['title'=>'團隊騎車 5 公里','points'=>14]
-  ];
+// 獲取用戶所在的所有團隊
+$stmt = $pdo->prepare('SELECT t.team_id AS id, t.name, t.code FROM teams t JOIN team_members tm ON t.team_id=tm.team_id WHERE tm.user_id=?');
+$stmt->execute([$user_id]);
+$teams = $stmt->fetchAll();
 
-  // count active tasks
+// 任務池
+$taskPool = [
+  ['title'=>'團隊步行 5000 步','points'=>10],
+  ['title'=>'一起喝 8 杯水','points'=>8],
+  ['title'=>'團體做 20 分鐘伸展','points'=>12],
+  ['title'=>'完成 30 分鐘有氧運動','points'=>15],
+  ['title'=>'共同完成 10000 步（分攤）','points'=>18],
+  ['title'=>'早睡 8 小時一次','points'=>8],
+  ['title'=>'完成 10 次深蹲','points'=>7],
+  ['title'=>'完成 15 分鐘核心訓練','points'=>9],
+  ['title'=>'團隊騎車 5 公里','points'=>14]
+];
+
+// 為每個團隊確保有3個任務並獲取資料
+$teamsData = [];
+foreach ($teams as $team) {
+  // 確保每個團隊有3個任務
   $stmt = $pdo->prepare('SELECT COUNT(*) FROM team_tasks WHERE team_id=? AND completed_at IS NULL');
   $stmt->execute([$team['id']]);
   $cnt = (int)$stmt->fetchColumn();
-
+  
   while ($cnt < 3) {
     $pick = $taskPool[array_rand($taskPool)];
     $ist = $pdo->prepare('INSERT INTO team_tasks (team_id,title,points) VALUES (?,?,?)');
     $ist->execute([$team['id'], $pick['title'], $pick['points']]);
     $cnt++;
   }
-
-  // fetch active tasks
-    $stmt = $pdo->prepare('SELECT team_id,title,points,created_at FROM team_tasks WHERE team_id=? AND completed_at IS NULL ORDER BY created_at');
+  
+  // 獲取任務
+  $stmt = $pdo->prepare('SELECT team_id,title,points,created_at FROM team_tasks WHERE team_id=? AND completed_at IS NULL ORDER BY created_at');
   $stmt->execute([$team['id']]);
   $tasks = $stmt->fetchAll();
-} else {
-  $tasks = [];
+  
+  // 獲取成員
+  $stmt = $pdo->prepare('SELECT u.user_id AS id,u.username,u.display_name,tm.role FROM team_members tm JOIN users u ON tm.user_id=u.user_id WHERE tm.team_id=?');
+  $stmt->execute([$team['id']]);
+  $members = $stmt->fetchAll();
+  
+  // 獲取自己在此團隊的角色
+  $stmt = $pdo->prepare('SELECT role FROM team_members WHERE team_id = ? AND user_id = ?');
+  $stmt->execute([$team['id'], $user_id]);
+  $my_role_row = $stmt->fetch();
+  $my_role = $my_role_row ? $my_role_row['role'] : '';
+  
+  $teamsData[] = [
+    'team' => $team,
+    'tasks' => $tasks,
+    'members' => $members,
+    'my_role' => $my_role
+  ];
 }
-
 ?>
 <!doctype html>
 <html lang="zh-TW">
@@ -91,7 +136,14 @@ if ($team) {
               <i class="fas fa-users"></i>我的團隊
             </h3>
 
-            <?php if (!$team): ?>
+            <?php if ($message): ?>
+              <div class="alert alert-success"><i class="fas fa-check-circle me-2"></i><?php echo htmlspecialchars($message); ?></div>
+            <?php endif; ?>
+            <?php if ($error): ?>
+              <div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+
+            <?php if (count($teamsData) === 0): ?>
               <div class="alert alert-info">
                 <i class="fas fa-info-circle me-2"></i>您目前尚未加入任何團隊
               </div>
@@ -104,77 +156,173 @@ if ($team) {
                 </a>
               </div>
             <?php else: ?>
-              <div class="mb-4 p-3" style="background: linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%); border-radius: var(--radius-md); border-left: 4px solid var(--primary);">
-                <h5 class="mb-2">
-                  <i class="fas fa-flag me-2"></i><?php echo htmlspecialchars($team['name']); ?>
-                </h5>
-                <div class="d-flex align-items-center gap-2">
-                  <span class="text-muted"><i class="fas fa-key me-1"></i>邀請碼：</span>
-                  <code class="px-2 py-1" style="background: white; border-radius: 6px; font-weight: 600; color: var(--primary);"><?php echo htmlspecialchars($team['code']); ?></code>
+              <?php foreach ($teamsData as $idx => $data): ?>
+                <?php $team = $data['team']; $tasks = $data['tasks']; $members = $data['members']; $my_role = $data['my_role']; ?>
+                <div class="mb-4 p-3" style="background: linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%); border-radius: var(--radius-md); border-left: 4px solid var(--primary);">
+                  <div>
+                    <h5 class="mb-2">
+                      <i class="fas fa-flag me-2"></i><?php echo htmlspecialchars($team['name']); ?>
+                      <?php if ($my_role === 'owner'): ?>
+                        <span class="badge bg-warning text-dark ms-2">擁有者</span>
+                      <?php endif; ?>
+                    </h5>
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="text-muted"><i class="fas fa-key me-1"></i>邀請碼：</span>
+                      <code class="px-2 py-1" style="background: white; border-radius: 6px; font-weight: 600; color: var(--primary);"><?php echo htmlspecialchars($team['code']); ?></code>
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              <h6 class="mt-4 mb-3">
-                <i class="fas fa-user-friends me-2"></i>成員列表
-              </h6>
-              <div class="table-responsive mb-3">
-                <table class="table table-sm align-middle">
-                  <thead>
-                    <tr>
-                      <th>名稱</th>
-                      <th>身分</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <?php foreach($members as $m): ?>
+                <h6 class="mt-4 mb-3">
+                  <i class="fas fa-user-friends me-2"></i>成員列表
+                </h6>
+                <div class="table-responsive mb-3">
+                  <table class="table table-sm align-middle">
+                    <thead>
                       <tr>
-                        <td><?php echo htmlspecialchars($m['display_name'] ?? $m['username']); ?></td>
-                        <td><?php echo htmlspecialchars($m['role']); ?></td>
+                        <th>名稱</th>
+                        <th>身分</th>
+                        <th>操作</th>
                       </tr>
-                    <?php endforeach; ?>
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      <?php foreach($members as $m): ?>
+                        <tr>
+                          <td>
+                            <?php echo htmlspecialchars($m['display_name'] ?? $m['username']); ?>
+                            <?php if ($m['id'] == $user_id): ?>
+                              <span class="badge bg-info ms-1">我</span>
+                            <?php endif; ?>
+                          </td>
+                          <td>
+                            <?php if ($m['role'] === 'owner'): ?>
+                              <span class="badge bg-warning text-dark">擁有者</span>
+                            <?php else: ?>
+                              <span class="badge bg-secondary">成員</span>
+                            <?php endif; ?>
+                          </td>
+                          <td>
+                            <?php if ($m['id'] == $user_id): ?>
+                              <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#leaveTeamModal<?php echo $team['id']; ?>">
+                                <i class="fas fa-sign-out-alt"></i>
+                              </button>
+                            <?php elseif ($my_role === 'owner'): ?>
+                              <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#kickMemberModal<?php echo $team['id']; ?>_<?php echo $m['id']; ?>">
+                                <i class="fas fa-user-times"></i>
+                              </button>
+                            <?php else: ?>
+                              <span class="text-muted">-</span>
+                            <?php endif; ?>
+                          </td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
 
-              <h6 class="mt-4 mb-3">
-                <i class="fas fa-tasks me-2"></i>團隊任務
-                <span class="badge bg-primary ms-2">3個任務</span>
-              </h6>
-              <div id="team-tasks" class="row row-cols-1 row-cols-md-3 g-3">
-                <?php foreach($tasks as $t): ?>
-                  <?php $task_key = $t['team_id'] . '|' . rawurlencode($t['created_at']); ?>
-                  <div class="col" id="task-card-<?php echo htmlspecialchars($task_key); ?>">
-                    <div class="card h-100" style="border-left: 4px solid var(--primary);">
-                      <div class="card-body d-flex flex-column">
-                        <h6 class="card-title mb-2">
-                          <i class="fas fa-clipboard-check me-2"></i><?php echo htmlspecialchars($t['title']); ?>
-                        </h6>
-                        <p class="mb-3 text-muted">
-                          <i class="fas fa-trophy me-1"></i>獎勵：<strong><?php echo (int)$t['points']; ?></strong> 點
-                        </p>
-                        <div class="mt-auto">
-                          <button data-team-id="<?php echo (int)$t['team_id']; ?>" data-created-at="<?php echo htmlspecialchars($t['created_at']); ?>" class="btn btn-sm btn-primary btn-complete w-100">
-                            <i class="fas fa-check-circle me-1"></i>完成
-                          </button>
+                <h6 class="mt-4 mb-3">
+                  <i class="fas fa-tasks me-2"></i>團隊任務
+                  <span class="badge bg-primary ms-2"><?php echo count($tasks); ?>個任務</span>
+                </h6>
+                <div id="team-tasks-<?php echo $team['id']; ?>" class="row row-cols-1 row-cols-md-3 g-3 mb-4">
+                  <?php foreach($tasks as $t): ?>
+                    <?php $task_key = $t['team_id'] . '|' . rawurlencode($t['created_at']); ?>
+                    <div class="col" id="task-card-<?php echo htmlspecialchars($task_key); ?>">
+                      <div class="card h-100" style="border-left: 4px solid var(--primary);">
+                        <div class="card-body d-flex flex-column">
+                          <h6 class="card-title mb-2">
+                            <i class="fas fa-clipboard-check me-2"></i><?php echo htmlspecialchars($t['title']); ?>
+                          </h6>
+                          <p class="mb-3 text-muted">
+                            <i class="fas fa-trophy me-1"></i>獎勵：<strong><?php echo (int)$t['points']; ?></strong> 點
+                          </p>
+                          <div class="mt-auto">
+                            <button data-team-id="<?php echo (int)$t['team_id']; ?>" data-created-at="<?php echo htmlspecialchars($t['created_at']); ?>" class="btn btn-sm btn-primary btn-complete w-100">
+                              <i class="fas fa-check-circle me-1"></i>完成
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                <?php endforeach; ?>
-              </div>
-            <?php endif; ?>
+                  <?php endforeach; ?>
+                </div>
 
-            <hr class="my-4">
-            <div class="text-center">
-              <a href="index.php" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-2"></i>返回首頁
-              </a>
-            </div>
+                <?php if ($idx < count($teamsData) - 1): ?>
+                  <hr class="my-4">
+                <?php endif; ?>
+              <?php endforeach; ?>
+            <?php endif; ?>
           </div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- 所有 Modal 放在 body 最外層 -->
+  <?php foreach ($teamsData as $data): ?>
+    <?php $team = $data['team']; $members = $data['members']; $my_role = $data['my_role']; ?>
+    
+    <!-- 退出團隊確認 Modal -->
+    <div class="modal fade" id="leaveTeamModal<?php echo $team['id']; ?>" tabindex="-1" aria-labelledby="leaveTeamModalLabel<?php echo $team['id']; ?>" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="leaveTeamModalLabel<?php echo $team['id']; ?>"><i class="fas fa-exclamation-triangle text-warning me-2"></i>確認退出團隊</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>確定要退出團隊 <strong><?php echo htmlspecialchars($team['name']); ?></strong> 嗎？</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              <i class="fas fa-times me-1"></i>否
+            </button>
+            <form method="post" class="d-inline">
+              <input type="hidden" name="action" value="leave_team">
+              <input type="hidden" name="team_id" value="<?php echo $team['id']; ?>">
+              <button type="submit" class="btn btn-danger">
+                <i class="fas fa-check me-1"></i>是
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 踢出成員確認 Modals -->
+    <?php if ($my_role === 'owner'): ?>
+      <?php foreach ($members as $m): ?>
+        <?php if ($m['id'] != $user_id): ?>
+        <div class="modal fade" id="kickMemberModal<?php echo $team['id']; ?>_<?php echo $m['id']; ?>" tabindex="-1" aria-labelledby="kickMemberModalLabel<?php echo $team['id']; ?>_<?php echo $m['id']; ?>" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="kickMemberModalLabel<?php echo $team['id']; ?>_<?php echo $m['id']; ?>"><i class="fas fa-exclamation-triangle text-warning me-2"></i>確認移除成員</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <p>確定要將 <strong><?php echo htmlspecialchars($m['display_name'] ?? $m['username']); ?></strong> 移出團隊 <strong><?php echo htmlspecialchars($team['name']); ?></strong> 嗎？</p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                  <i class="fas fa-times me-1"></i>否
+                </button>
+                <form method="post" class="d-inline">
+                  <input type="hidden" name="action" value="kick_member">
+                  <input type="hidden" name="team_id" value="<?php echo $team['id']; ?>">
+                  <input type="hidden" name="member_id" value="<?php echo $m['id']; ?>">
+                  <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-check me-1"></i>是
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+        <?php endif; ?>
+      <?php endforeach; ?>
+    <?php endif; ?>
+  <?php endforeach; ?>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
