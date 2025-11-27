@@ -1,14 +1,21 @@
 kind: wasmer.io/App.v0
 name: ntust-healthmap
-package: php/php
+package: php/php@8.3.1
 description: NTUST Health Task Map - 台科大健康任務地圖
 debug: true
+
+runner: wasi
 
 cli_args:
   - -S
   - 0.0.0.0:8080
   - -t
-  - /app
+  - .
+
+capabilities:
+  inbound_network:
+    - 0.0.0.0:8080
+  outbound_network: true
 
 env:
   # PHP settings
@@ -29,6 +36,3 @@ env:
 
 scaling:
   mode: single_concurrency
-
-fs:
-  "/app": .
