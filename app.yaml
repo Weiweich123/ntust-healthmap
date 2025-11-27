@@ -4,11 +4,13 @@ package: php/php@8.3.1
 description: NTUST Health Task Map - 台科大健康任務地圖
 debug: true
 
+source: .
+
 cli_args:
   - -S
   - 0.0.0.0:8080
   - -t
-  - .
+  - /src
 
 env:
   # PHP settings
