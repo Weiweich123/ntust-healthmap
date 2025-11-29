@@ -37,6 +37,15 @@ try {
     $stmt = $pdo->prepare('INSERT INTO user_buildings (user_id,building_id,level,unlocked_at) VALUES (?,?,?,NOW())');
     $stmt->execute([$uid,$bid,1]);
 
+    // 記錄金錢獲得紀錄
+    $stmt = $pdo->prepare('SELECT name FROM buildings WHERE building_id = ?');
+    $stmt->execute([$bid]);
+    $building = $stmt->fetch();
+    $building_name = $building ? $building['name'] : '建築';
+    
+    $stmt = $pdo->prepare('INSERT INTO money_logs (user_id, amount, source, description, related_id) VALUES (?, ?, ?, ?, ?)');
+    $stmt->execute([$uid, $b['reward_money'], 'building_unlock', "解鎖 {$building_name}", $bid]);
+
     $pdo->commit();
     // return updated level and user points/money for front-end convenience
     $stmt = $pdo->prepare('SELECT points,money FROM users WHERE user_id = ?');
@@ -44,22 +53,6 @@ try {
     $u2 = $stmt->fetch();
     header('Content-Type: application/json'); echo json_encode(['success'=>true,'message'=>'解鎖成功','level'=>1,'points'=>$u2['points'],'money'=>$u2['money']]); exit;
 } catch (Exception $e) {
-    // 確保回滾交易
-    try {
-        if (method_exists($pdo, 'inTransaction') && $pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
-    } catch (Exception $rollbackError) {
-        // 忽略回滾錯誤
-    }
-
-    // 記錄錯誤（開發用）
-    error_log('unlock_building error: ' . $e->getMessage());
-
-    header('Content-Type: application/json');
-    echo json_encode([
-        'success' => false,
-        'message' => $e->getMessage()
-    ]);
-    exit;
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    header('Content-Type: application/json'); echo json_encode(['success'=>false,'message'=>$e->getMessage()]); exit;
 }

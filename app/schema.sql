@@ -1,3 +1,5 @@
+-- @dialect MySQL
+-- MySQL/MariaDB Schema for NTUST Health Map
 
 CREATE DATABASE IF NOT EXISTS `ntust_healthmap` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `ntust_healthmap`;
@@ -7,6 +9,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `username` VARCHAR(100) NOT NULL UNIQUE,
   `password_hash` VARCHAR(255) NOT NULL,
   `display_name` VARCHAR(150) DEFAULT NULL,
+  `birth_date` DATE DEFAULT NULL,
   `points` INT DEFAULT 0,
   `money` INT DEFAULT 0,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -110,6 +113,22 @@ CREATE TABLE IF NOT EXISTS `friendships` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================================
+-- 團隊邀請資料表
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `team_invites` (
+  `invite_id` INT AUTO_INCREMENT PRIMARY KEY,
+  `team_id` INT NOT NULL,
+  `inviter_id` INT NOT NULL,
+  `invitee_id` INT NOT NULL,
+  `status` ENUM('pending','accepted','rejected') DEFAULT 'pending',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `unique_invite` (`team_id`, `invitee_id`, `status`),
+  CONSTRAINT `fk_ti_team` FOREIGN KEY (`team_id`) REFERENCES `teams`(`team_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_ti_inviter` FOREIGN KEY (`inviter_id`) REFERENCES `users`(`user_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_ti_invitee` FOREIGN KEY (`invitee_id`) REFERENCES `users`(`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
 -- MIGRATION INSTRUCTIONS: Run these commands in phpMyAdmin SQL tab to migrate existing DB
 -- (Remove the -- comments before each line to execute, or copy the uncommented version below)
 -- ============================================================================
@@ -146,3 +165,41 @@ CREATE TABLE IF NOT EXISTS `friendships` (
 -- STEP 6: (Optional) After verifying everything works, drop old table
 -- DROP TABLE activities_old;
 -- DROP TABLE activities_backup;
+
+-- ============================================================================
+-- MIGRATION: Add birth_date column to existing users table
+-- ============================================================================
+-- ALTER TABLE users ADD COLUMN birth_date DATE DEFAULT NULL AFTER display_name;
+
+-- ============================================================================
+-- 金錢紀錄資料表（記錄所有金錢變動）
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `money_logs` (
+  `log_id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `amount` INT NOT NULL,
+  `source` VARCHAR(50) NOT NULL COMMENT 'building_unlock, building_upgrade',
+  `description` VARCHAR(255) DEFAULT NULL,
+  `related_id` INT DEFAULT NULL COMMENT '相關ID（如building_id）',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT `fk_ml_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`user_id`) ON DELETE CASCADE,
+  KEY `idx_user_date` (`user_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- 好友聊天訊息資料表
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `chat_messages` (
+  `message_id` INT AUTO_INCREMENT PRIMARY KEY,
+  `sender_id` INT NOT NULL,
+  `receiver_id` INT NOT NULL,
+  `message_type` ENUM('text', 'voice') DEFAULT 'text' COMMENT '訊息類型：文字或語音',
+  `content` TEXT NOT NULL COMMENT '文字訊息內容或語音檔案路徑',
+  `is_read` TINYINT(1) DEFAULT 0 COMMENT '是否已讀：0=未讀, 1=已讀',
+  `read_at` TIMESTAMP NULL COMMENT '已讀時間',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT `fk_cm_sender` FOREIGN KEY (`sender_id`) REFERENCES `users`(`user_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_cm_receiver` FOREIGN KEY (`receiver_id`) REFERENCES `users`(`user_id`) ON DELETE CASCADE,
+  KEY `idx_sender_receiver` (`sender_id`, `receiver_id`),
+  KEY `idx_receiver_unread` (`receiver_id`, `is_read`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

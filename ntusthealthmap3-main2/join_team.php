@@ -3,18 +3,32 @@ require_once __DIR__ . '/db.php';
 require_login();
 
 $msg = '';
+$msg_type = 'success';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $code = trim($_POST['code'] ?? '');
-    if ($code === '') $msg = '請輸入團隊邀請碼';
-    else {
+    if ($code === '') {
+        $msg = '請輸入團隊邀請碼';
+        $msg_type = 'warning';
+    } else {
         $stmt = $pdo->prepare('SELECT team_id FROM teams WHERE code = ?');
         $stmt->execute([$code]);
         $team = $stmt->fetch();
-        if (!$team) $msg = '邀請碼無效';
-        else {
-            $stmt = $pdo->prepare('INSERT IGNORE INTO team_members (team_id,user_id,role) VALUES (?,?,?)');
-            $stmt->execute([$team['team_id'],$_SESSION['user_id'],'member']);
-            $msg = '已加入團隊';
+        if (!$team) {
+            $msg = '邀請碼無效';
+            $msg_type = 'danger';
+        } else {
+            // 檢查是否已在該團隊中
+            $stmt = $pdo->prepare('SELECT * FROM team_members WHERE team_id = ? AND user_id = ?');
+            $stmt->execute([$team['team_id'], $_SESSION['user_id']]);
+            if ($stmt->fetch()) {
+                $msg = '已在該團隊中';
+                $msg_type = 'warning';
+            } else {
+                $stmt = $pdo->prepare('INSERT INTO team_members (team_id,user_id,role) VALUES (?,?,?)');
+                $stmt->execute([$team['team_id'],$_SESSION['user_id'],'member']);
+                $msg = '已加入團隊';
+                $msg_type = 'success';
+            }
         }
     }
 }
@@ -54,8 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                           <p class="text-muted">輸入邀請碼加入現有團隊</p>
                         </div>
                         <?php if($msg):?>
-                          <div class="alert alert-success">
-                            <i class="fas fa-check-circle me-2"></i><?php echo htmlspecialchars($msg);?>
+                          <div class="alert alert-<?php echo $msg_type; ?>">
+                            <i class="fas fa-<?php echo $msg_type === 'success' ? 'check-circle' : ($msg_type === 'danger' ? 'exclamation-circle' : 'exclamation-triangle'); ?> me-2"></i><?php echo htmlspecialchars($msg);?>
                           </div>
                         <?php endif;?>
                         <form method="post">

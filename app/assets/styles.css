@@ -14,12 +14,12 @@
   --gradient-primary: linear-gradient(135deg, #6C63FF 0%, #9D4EDD 100%);
   --gradient-secondary: linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%);
   --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-
+  
   --success: #10B981;
   --warning: #F59E0B;
   --danger: #EF4444;
   --info: #3B82F6;
-
+  
   --gray-50: #F9FAFB;
   --gray-100: #F3F4F6;
   --gray-200: #E5E7EB;
@@ -29,7 +29,7 @@
   --gray-700: #374151;
   --gray-800: #1F2937;
   --gray-900: #111827;
-
+  
   --font-main: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -45,6 +45,11 @@
 /* === Reset & Base === */
 * { box-sizing: border-box; }
 
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
 body {
   font-family: var(--font-main);
   background: linear-gradient(180deg, #F8F7FF 0%, #F0EDFF 100%);
@@ -55,6 +60,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Auth page specific - prevent scrolling */
+html:has(body.auth-page),
+body.auth-page {
+  height: 100vh;
+  overflow: hidden;
+}
+
 /* === Navbar === */
 .navbar {
   background: rgba(255,255,255,0.9) !important;
@@ -63,6 +75,29 @@ body {
   border-bottom: 1px solid rgba(124,58,237,0.1);
   padding: 0.875rem 0;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  position: sticky;
+  top: 0;
+  z-index: 1050;
+}
+
+/* 確保下拉選單顯示在最上層 */
+.navbar .dropdown {
+  position: static;
+}
+
+.navbar .dropdown-menu {
+  z-index: 9999 !important;
+  background-color: #ffffff !important;
+  border: 1px solid rgba(0,0,0,0.15) !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2) !important;
+}
+
+.navbar .dropdown-menu .dropdown-item {
+  background-color: #ffffff;
+}
+
+.navbar .dropdown-menu .dropdown-item:hover {
+  background-color: #f8f9fa;
 }
 
 .navbar-brand {
@@ -270,6 +305,19 @@ body {
   box-shadow: var(--shadow-xl);
   border: 3px solid white;
   overflow: hidden;
+  position: relative;
+  z-index: 0;
+}
+
+/* 確保 Leaflet 地圖控制項不會超過 navbar */
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 400 !important;
+}
+
+.leaflet-control {
+  z-index: 800 !important;
 }
 
 /* === Popup === */
@@ -379,36 +427,39 @@ body {
 
 /* === Auth Pages (Login/Register) === */
 .auth-page {
-  min-height: 100vh;
+  height: 100vh;
   background: var(--gradient-bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1rem;
+  padding: 1rem;
   position: relative;
   overflow: hidden;
+  margin: 0;
 }
 
 .auth-page::before {
   content: '';
-  position: absolute;
+  position: fixed;
   width: 500px;
   height: 500px;
   background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
   top: -200px;
   right: -200px;
   border-radius: 50%;
+  pointer-events: none;
 }
 
 .auth-page::after {
   content: '';
-  position: absolute;
+  position: fixed;
   width: 400px;
   height: 400px;
   background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
   bottom: -150px;
   left: -150px;
   border-radius: 50%;
+  pointer-events: none;
 }
 
 .auth-card {
@@ -505,11 +556,11 @@ body {
     height: 400px;
     min-height: 350px;
   }
-
+  
   .auth-card {
     padding: 2rem 1.5rem;
   }
-
+  
   .card-body {
     padding: 1.25rem;
   }

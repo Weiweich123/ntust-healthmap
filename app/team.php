@@ -15,10 +15,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $stmt->execute([$team_id, $user_id]);
         $membership = $stmt->fetch();
         if ($membership) {
+            $was_owner = ($membership['role'] === 'owner');
+            
             // 刪除自己
             $stmt = $pdo->prepare('DELETE FROM team_members WHERE team_id = ? AND user_id = ?');
             $stmt->execute([$team_id, $user_id]);
-            $message = '已退出團隊';
+            
+            // 如果是擁有者退出，將擁有權轉移給下一位成員
+            if ($was_owner) {
+                // 找到下一位成員（按加入順序）
+                $stmt = $pdo->prepare('SELECT user_id FROM team_members WHERE team_id = ? ORDER BY user_id ASC LIMIT 1');
+                $stmt->execute([$team_id]);
+                $next_member = $stmt->fetch();
+                if ($next_member) {
+                    // 將下一位成員設為擁有者
+                    $stmt = $pdo->prepare('UPDATE team_members SET role = "owner" WHERE team_id = ? AND user_id = ?');
+                    $stmt->execute([$team_id, $next_member['user_id']]);
+                    $message = '已退出團隊，擁有者身分已轉移給下一位成員';
+                } else {
+                    // 如果沒有其他成員，刪除團隊
+                    $stmt = $pdo->prepare('DELETE FROM teams WHERE team_id = ?');
+                    $stmt->execute([$team_id]);
+                    $message = '已退出團隊，團隊已解散';
+                }
+            } else {
+                $message = '已退出團隊';
+            }
         }
     } elseif ($_POST['action'] === 'kick_member') {
         $team_id = (int)($_POST['team_id'] ?? 0);
@@ -37,8 +59,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } else {
             $error = '只有團隊擁有者可以移除成員';
         }
+    } elseif ($_POST['action'] === 'accept_invite') {
+        $invite_id = (int)($_POST['invite_id'] ?? 0);
+        // 確認邀請存在且是給自己的
+        $stmt = $pdo->prepare('SELECT * FROM team_invites WHERE invite_id = ? AND invitee_id = ? AND status = "pending"');
+        $stmt->execute([$invite_id, $user_id]);
+        $invite = $stmt->fetch();
+        if ($invite) {
+            // 加入團隊
+            $stmt = $pdo->prepare('INSERT IGNORE INTO team_members (team_id, user_id, role) VALUES (?, ?, "member")');
+            $stmt->execute([$invite['team_id'], $user_id]);
+            // 更新邀請狀態
+            $stmt = $pdo->prepare('UPDATE team_invites SET status = "accepted" WHERE invite_id = ?');
+            $stmt->execute([$invite_id]);
+            $message = '已成功加入團隊';
+        } else {
+            $error = '邀請不存在或已過期';
+        }
+    } elseif ($_POST['action'] === 'reject_invite') {
+        $invite_id = (int)($_POST['invite_id'] ?? 0);
+        // 確認邀請存在且是給自己的
+        $stmt = $pdo->prepare('SELECT * FROM team_invites WHERE invite_id = ? AND invitee_id = ? AND status = "pending"');
+        $stmt->execute([$invite_id, $user_id]);
+        if ($stmt->fetch()) {
+            // 更新邀請狀態為拒絕
+            $stmt = $pdo->prepare('UPDATE team_invites SET status = "rejected" WHERE invite_id = ?');
+            $stmt->execute([$invite_id]);
+            $message = '已拒絕團隊邀請';
+        }
     }
 }
+
+// 獲取待處理的團隊邀請
+$stmt = $pdo->prepare('
+    SELECT ti.invite_id, ti.team_id, ti.created_at,
+           t.name AS team_name,
+           u.display_name AS inviter_name, u.username AS inviter_username
+    FROM team_invites ti
+    JOIN teams t ON ti.team_id = t.team_id
+    JOIN users u ON ti.inviter_id = u.user_id
+    WHERE ti.invitee_id = ? AND ti.status = "pending"
+    ORDER BY ti.created_at DESC
+');
+$stmt->execute([$user_id]);
+$pending_invites = $stmt->fetchAll();
 
 // 獲取用戶所在的所有團隊
 $stmt = $pdo->prepare('SELECT t.team_id AS id, t.name, t.code FROM teams t JOIN team_members tm ON t.team_id=tm.team_id WHERE tm.user_id=?');
@@ -114,14 +178,8 @@ foreach ($teams as $team) {
         <i class="fas fa-heartbeat me-2"></i>台科大健康任務地圖
       </a>
       <div class="d-flex align-items-center gap-2">
-        <a class="btn btn-outline-primary btn-sm" href="create_team.php">
-          <i class="fas fa-plus me-1"></i>建立
-        </a>
-        <a class="btn btn-outline-success btn-sm" href="join_team.php">
-          <i class="fas fa-sign-in-alt me-1"></i>加入
-        </a>
         <a class="btn btn-outline-secondary btn-sm" href="index.php">
-          <i class="fas fa-arrow-left"></i>
+          <i class="fas fa-arrow-left me-1"></i>返回
         </a>
       </div>
     </div>
@@ -141,6 +199,43 @@ foreach ($teams as $team) {
             <?php endif; ?>
             <?php if ($error): ?>
               <div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+
+            <!-- 團隊邀請區塊 -->
+            <?php if (count($pending_invites) > 0): ?>
+              <div class="mb-4">
+                <h5 class="mb-3">
+                  <i class="fas fa-envelope me-2 text-warning"></i>待處理的團隊邀請
+                  <span class="badge bg-danger ms-2"><?php echo count($pending_invites); ?></span>
+                </h5>
+                <?php foreach ($pending_invites as $invite): ?>
+                  <div class="alert alert-warning d-flex justify-content-between align-items-center mb-2" style="border-left: 4px solid #F59E0B;">
+                    <div>
+                      <i class="fas fa-user-plus me-2"></i>
+                      <strong><?php echo htmlspecialchars($invite['inviter_name'] ?? $invite['inviter_username']); ?></strong>
+                      邀請你加入團隊
+                      <strong><?php echo htmlspecialchars($invite['team_name']); ?></strong>
+                    </div>
+                    <div class="d-flex gap-2">
+                      <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="accept_invite">
+                        <input type="hidden" name="invite_id" value="<?php echo $invite['invite_id']; ?>">
+                        <button type="submit" class="btn btn-success btn-sm">
+                          <i class="fas fa-check me-1"></i>是
+                        </button>
+                      </form>
+                      <form method="post" class="d-inline">
+                        <input type="hidden" name="action" value="reject_invite">
+                        <input type="hidden" name="invite_id" value="<?php echo $invite['invite_id']; ?>">
+                        <button type="submit" class="btn btn-danger btn-sm">
+                          <i class="fas fa-times me-1"></i>否
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+              <hr class="mb-4">
             <?php endif; ?>
 
             <?php if (count($teamsData) === 0): ?>
@@ -177,38 +272,35 @@ foreach ($teams as $team) {
                   <i class="fas fa-user-friends me-2"></i>成員列表
                 </h6>
                 <div class="table-responsive mb-3">
-                  <table class="table table-sm align-middle">
+                  <table class="table table-sm align-middle text-center">
                     <thead>
                       <tr>
-                        <th>名稱</th>
-                        <th>身分</th>
-                        <th>操作</th>
+                        <th class="text-center">名稱</th>
+                        <th class="text-center">身分</th>
+                        <th class="text-center">操作</th>
                       </tr>
                     </thead>
                     <tbody>
                       <?php foreach($members as $m): ?>
                         <tr>
-                          <td>
+                          <td class="text-center">
                             <?php echo htmlspecialchars($m['display_name'] ?? $m['username']); ?>
-                            <?php if ($m['id'] == $user_id): ?>
-                              <span class="badge bg-info ms-1">我</span>
-                            <?php endif; ?>
                           </td>
-                          <td>
+                          <td class="text-center">
                             <?php if ($m['role'] === 'owner'): ?>
                               <span class="badge bg-warning text-dark">擁有者</span>
                             <?php else: ?>
                               <span class="badge bg-secondary">成員</span>
                             <?php endif; ?>
                           </td>
-                          <td>
+                          <td class="text-center">
                             <?php if ($m['id'] == $user_id): ?>
                               <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#leaveTeamModal<?php echo $team['id']; ?>">
-                                <i class="fas fa-sign-out-alt"></i>
+                                <i class="fas fa-sign-out-alt me-1"></i>退出
                               </button>
                             <?php elseif ($my_role === 'owner'): ?>
                               <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#kickMemberModal<?php echo $team['id']; ?>_<?php echo $m['id']; ?>">
-                                <i class="fas fa-user-times"></i>
+                                <i class="fas fa-user-times me-1"></i>移除
                               </button>
                             <?php else: ?>
                               <span class="text-muted">-</span>

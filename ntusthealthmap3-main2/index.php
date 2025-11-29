@@ -1,12 +1,17 @@
 <?php
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/age_standards.php';
 require_login();
 
 $user_id = $_SESSION['user_id'];
 // fetch user info
-$stmt = $pdo->prepare('SELECT user_id, username, display_name, points, money FROM users WHERE user_id = ?');
+$stmt = $pdo->prepare('SELECT user_id, username, display_name, points, money, birth_date FROM users WHERE user_id = ?');
 $stmt->execute([$user_id]);
 $user = $stmt->fetch();
+
+// 計算使用者年齡並取得運動建議
+$user_age = calculate_age($user['birth_date'] ?? null);
+$exercise_rec = get_exercise_recommendations($user_age);
 
 // get user's unlocked buildings and levels
 $stmt = $pdo->prepare('SELECT ub.building_id, ub.level, b.name FROM user_buildings ub JOIN buildings b ON ub.building_id=b.building_id WHERE ub.user_id = ?');
@@ -22,6 +27,16 @@ foreach ($user_buildings as $bid => $info) {
   $ub_levels[$bid] = (int)$info['level'];
 }
 
+// 查詢待處理的好友請求數量
+$stmt = $pdo->prepare('SELECT COUNT(*) FROM friendships WHERE friend_id = ? AND status = "pending"');
+$stmt->execute([$user_id]);
+$pending_friend_requests = (int)$stmt->fetchColumn();
+
+// 查詢待處理的團隊邀請數量
+$stmt = $pdo->prepare('SELECT COUNT(*) FROM team_invites WHERE invitee_id = ? AND status = "pending"');
+$stmt->execute([$user_id]);
+$pending_team_invites = (int)$stmt->fetchColumn();
+
 ?>
 <!doctype html>
 <html lang="zh-TW">
@@ -33,6 +48,35 @@ foreach ($user_buildings as $bid => $info) {
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    /* 強制下拉選單顯示在地圖之上 */
+    .user-dropdown-menu {
+      z-index: 99999 !important;
+      position: absolute !important;
+      background-color: white !important;
+      opacity: 1 !important;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25) !important;
+      border: 1px solid #ddd !important;
+    }
+    .user-dropdown-menu * {
+      background-color: white !important;
+    }
+    .user-dropdown-menu .dropdown-item:hover {
+      background-color: #f0f0f0 !important;
+    }
+    .user-dropdown-menu .dropdown-divider {
+      background-color: #dee2e6 !important;
+    }
+    /* 限制地圖區域的堆疊層級 */
+    .col-lg-8 {
+      position: relative;
+      z-index: 1;
+    }
+    .navbar {
+      position: relative;
+      z-index: 9999;
+    }
+  </style>
 </head>
 <body>
   <nav class="navbar navbar-expand-lg">
@@ -41,22 +85,44 @@ foreach ($user_buildings as $bid => $info) {
         <i class="fas fa-heartbeat me-2"></i>台科大健康任務地圖
       </a>
       <div class="d-flex align-items-center gap-3">
-        <div class="d-none d-md-block">
-          <i class="fas fa-user-circle me-1 text-muted"></i>
-          <strong><?php echo htmlspecialchars($user['display_name'] ?? $user['username']); ?></strong>
-        </div>
+        <a class="btn btn-outline-warning btn-sm" href="points_history.php" title="查詢點數金錢紀錄">
+          <i class="fas fa-chart-line me-1"></i>點數及金錢紀錄查詢
+        </a>
         <span class="badge bg-primary">
           <i class="fas fa-star me-1"></i><?php echo (int)$user['points']; ?> 點
         </span>
         <span class="badge bg-success">
           <i class="fas fa-coins me-1"></i><?php echo (int)$user['money']; ?> 元
         </span>
-        <a class="btn btn-outline-info btn-sm" href="friends.php" title="好友列表">
-          <i class="fas fa-user-friends"></i>
-        </a>
-        <a class="btn btn-outline-secondary btn-sm" href="logout.php">
-          <i class="fas fa-sign-out-alt"></i>
-        </a>
+        
+        <!-- 使用者頭像下拉選單 -->
+        <div class="dropdown">
+          <button class="btn btn-outline-dark btn-sm dropdown-toggle position-relative" type="button" id="userDropdown" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+            <i class="fas fa-user-circle me-1"></i>
+            <?php echo htmlspecialchars($user['display_name'] ?? $user['username']); ?>
+            <?php if ($pending_friend_requests > 0): ?>
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem;">
+              <?php echo $pending_friend_requests > 99 ? '99+' : $pending_friend_requests; ?>
+            </span>
+            <?php endif; ?>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end user-dropdown-menu" aria-labelledby="userDropdown">
+            <li>
+              <a class="dropdown-item py-2" href="friends.php">
+                <i class="fas fa-heart me-2 text-info"></i>我的好友
+                <?php if ($pending_friend_requests > 0): ?>
+                <span class="badge bg-danger ms-2"><?php echo $pending_friend_requests > 99 ? '99+' : $pending_friend_requests; ?></span>
+                <?php endif; ?>
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item py-2 text-danger" href="logout.php">
+                <i class="fas fa-sign-out-alt me-2"></i>登出
+              </a>
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   </nav>
@@ -67,7 +133,7 @@ foreach ($user_buildings as $bid => $info) {
         <div class="card mb-4">
           <div class="card-body">
             <h5 class="card-title">
-              <i class="fas fa-running"></i>提交今日運動
+              <i class="fas fa-running"></i>提交運動數據
             </h5>
             <form id="activityForm" method="post" action="submit_activity.php">
               <div class="mb-3">
@@ -85,6 +151,14 @@ foreach ($user_buildings as $bid => $info) {
               <div class="mb-4">
                 <label class="form-label">喝水 (毫升)</label>
                 <input name="water_ml" type="number" min="0" class="form-control" placeholder="飲水量" required>
+              </div>
+              <div class="alert alert-info py-2 mb-3" style="font-size: 0.85rem;">
+                <i class="fas fa-info-circle me-1"></i>
+                <strong><?php echo htmlspecialchars($exercise_rec['age_group']); ?>建議：</strong><br>
+                步數 <?php echo number_format($exercise_rec['daily_steps']); ?> 步 / 運動 <?php echo $exercise_rec['daily_exercise']; ?> 分鐘 / 飲水 <?php echo number_format($exercise_rec['daily_water']); ?> ml
+                <?php if ($user_age !== null): ?>
+                <span class="badge bg-secondary ms-2"><?php echo $user_age; ?> 歲</span>
+                <?php endif; ?>
               </div>
               <div class="d-grid gap-2">
                 <button type="submit" class="btn btn-primary">
@@ -105,8 +179,13 @@ foreach ($user_buildings as $bid => $info) {
             </h5>
             <p class="text-muted small mb-3">與朋友一起解任務可獲得額外加成</p>
             <div class="d-grid gap-2">
-              <a class="btn btn-outline-info" href="team.php">
+              <a class="btn btn-outline-info position-relative" href="team.php">
                 <i class="fas fa-user-friends me-2"></i>我的團隊
+                <?php if ($pending_team_invites > 0): ?>
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem;">
+                  <?php echo $pending_team_invites > 99 ? '99+' : $pending_team_invites; ?>
+                </span>
+                <?php endif; ?>
               </a>
               <a class="btn btn-outline-primary" href="create_team.php">
                 <i class="fas fa-plus-circle me-2"></i>建立團隊
@@ -120,7 +199,9 @@ foreach ($user_buildings as $bid => $info) {
       </div>
 
       <div class="col-lg-8 d-flex flex-column">
-        <div id="map" class="mb-4"></div>
+        <div style="position: relative; z-index: 1;">
+          <div id="map" class="mb-4"></div>
+        </div>
         <div class="card flex-grow-1">
           <div class="card-body d-flex flex-column justify-content-center align-items-center text-center">
             <h2 class="mb-4">
@@ -141,7 +222,8 @@ foreach ($user_buildings as $bid => $info) {
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    const map = L.map('map').setView([25.0193,121.5392], 17);
+    // 國立台灣科技大學中心座標
+    const map = L.map('map').setView([25.0130, 121.5415], 16);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
     const userBuildings = <?php echo json_encode($ub_levels, JSON_HEX_TAG); ?>;

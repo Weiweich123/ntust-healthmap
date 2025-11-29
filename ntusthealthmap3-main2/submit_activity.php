@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/age_standards.php';
 require_login();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -17,14 +18,19 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $activity_date)) {
     $activity_date = date('Y-m-d');
 }
 
-// Simple points formula (you can tune these):
-// 每1000步 = 2 點; 每30分鐘運動 = 3 點; 每500ml水 = 1 點
-    $steps_points = floor($steps / 1000) * 2;
-    $time_points = floor($time_minutes / 30) * 3;
-    $water_points = floor($water_ml / 500) * 1;
-    $points = max(0, $steps_points + $time_points + $water_points);
-    // MONEY intentionally disabled on activity submission: only points are granted
-    $money = 0;
+// 取得使用者出生日期，計算年齡
+$stmt = $pdo->prepare('SELECT birth_date FROM users WHERE user_id = ?');
+$stmt->execute([$user_id]);
+$user_data = $stmt->fetch();
+$birth_date = $user_data['birth_date'] ?? null;
+$age = calculate_age($birth_date);
+
+// 根據年齡計算點數
+$points_result = calculate_points_by_age($age, $steps, $time_minutes, $water_ml);
+$points = $points_result['total'];
+
+// MONEY intentionally disabled on activity submission: only points are granted
+$money = 0;
 
 try {
     $pdo->beginTransaction();

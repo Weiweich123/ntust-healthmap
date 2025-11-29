@@ -32,21 +32,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <link href="assets/styles.css" rel="stylesheet">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden !important;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
 </head>
 <body class="auth-page">
   <div class="auth-card">
-    <div class="auth-logo">
-      <i class="fas fa-heartbeat"></i>
-    </div>
-    <h1 class="auth-title">歡迎回來</h1>
-    <p class="auth-subtitle">登入以繼續您的健康任務</p>
-
+          <div class="auth-logo">
+            <i class="fas fa-heartbeat"></i>
+          </div>
+          <h1 class="auth-title">歡迎回來</h1>
+          <p class="auth-subtitle">登入以繼續您的健康任務</p>
+    
     <?php if ($error): ?>
       <div class="alert alert-danger" role="alert">
         <i class="fas fa-exclamation-circle me-2"></i><?php echo htmlspecialchars($error); ?>
       </div>
     <?php endif; ?>
-
+    
     <form method="post">
       <div class="mb-3">
         <label class="form-label">帳號</label>
@@ -62,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </button>
       </div>
     </form>
-
+    
     <div class="auth-footer">
       <span class="text-muted">還沒有帳號？</span>
       <a href="register.php">立即註冊</a>

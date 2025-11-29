@@ -52,7 +52,7 @@ $filter_month = $_GET['month'] ?? '';
 $filter_day = $_GET['day'] ?? '';
 
 // 建立查詢
-$sql = 'SELECT activity_id, activity_date, steps, time_minutes, water_ml, created_at FROM activities WHERE user_id = ?';
+$sql = 'SELECT activity_id, activity_date, steps, time_minutes, water_ml, points_earned, created_at FROM activities WHERE user_id = ?';
 $params = [$user_id];
 
 if ($filter_year !== '') {
@@ -246,30 +246,32 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
               </div>
             <?php else: ?>
               <div class="table-responsive">
-                <table class="table table-hover align-middle" id="activityTable">
+                <table class="table table-hover align-middle text-center" id="activityTable">
                   <thead class="table-light">
                     <tr>
-                      <th class="d-none delete-checkbox-col" style="width: 50px;">
+                      <th class="d-none delete-checkbox-col text-center align-middle" style="width: 50px;">
                         <input type="checkbox" class="form-check-input" id="selectAll">
                       </th>
-                      <th><i class="fas fa-calendar me-1"></i>日期</th>
-                      <th><i class="fas fa-shoe-prints me-1"></i>步數</th>
-                      <th><i class="fas fa-clock me-1"></i>運動時間</th>
-                      <th><i class="fas fa-tint me-1"></i>喝水量</th>
-                      <th class="d-none edit-action-col">操作</th>
+                      <th class="text-center align-middle"><i class="fas fa-calendar me-1"></i>日期</th>
+                      <th class="text-center align-middle"><i class="fas fa-shoe-prints me-1"></i>步數</th>
+                      <th class="text-center align-middle"><i class="fas fa-clock me-1"></i>運動時間</th>
+                      <th class="text-center align-middle"><i class="fas fa-tint me-1"></i>喝水量</th>
+                      <th class="text-center align-middle"><i class="fas fa-star me-1"></i>點數獲得</th>
+                      <th class="d-none edit-action-col text-center align-middle">操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     <?php foreach ($activities as $act): ?>
                       <tr data-id="<?php echo $act['activity_id']; ?>">
-                        <td class="d-none delete-checkbox-col">
+                        <td class="d-none delete-checkbox-col text-center align-middle">
                           <input type="checkbox" class="form-check-input delete-check" name="delete_ids[]" value="<?php echo $act['activity_id']; ?>" form="deleteForm">
                         </td>
-                        <td><?php echo htmlspecialchars($act['activity_date']); ?></td>
-                        <td><span class="badge bg-primary"><?php echo number_format($act['steps']); ?></span></td>
-                        <td><span class="badge bg-success"><?php echo (int)$act['time_minutes']; ?> 分鐘</span></td>
-                        <td><span class="badge bg-info"><?php echo number_format($act['water_ml']); ?> ml</span></td>
-                        <td class="d-none edit-action-col">
+                        <td class="text-center align-middle"><?php echo htmlspecialchars($act['activity_date']); ?></td>
+                        <td class="text-center align-middle"><?php echo number_format($act['steps']); ?></td>
+                        <td class="text-center align-middle"><?php echo (int)$act['time_minutes']; ?> 分鐘</td>
+                        <td class="text-center align-middle"><?php echo number_format($act['water_ml']); ?> ml</td>
+                        <td class="text-center align-middle"><?php echo number_format($act['points_earned']); ?> 點</td>
+                        <td class="d-none edit-action-col text-center align-middle">
                           <a href="activity_history.php?edit=<?php echo $act['activity_id']; ?>&year=<?php echo urlencode($filter_year); ?>&month=<?php echo urlencode($filter_month); ?>&day=<?php echo urlencode($filter_day); ?>" class="btn btn-outline-warning btn-sm edit-btn">
                             <i class="fas fa-pen"></i>
                           </a>

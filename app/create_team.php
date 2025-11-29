@@ -25,38 +25,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>建立團隊 - 台科大健康任務地圖</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="assets/styles.css" rel="stylesheet">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+    <nav class="navbar navbar-expand-lg">
         <div class="container">
-            <a class="navbar-brand" href="index.php">台科大健康任務地圖</a>
-            <div class="collapse navbar-collapse">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="team.php">我的團隊</a></li>
-                </ul>
-            </div>
+            <a class="navbar-brand" href="index.php">
+              <i class="fas fa-heartbeat me-2"></i>台科大健康任務地圖
+            </a>
+            <a class="btn btn-outline-secondary btn-sm" href="index.php">
+              <i class="fas fa-arrow-left me-1"></i>返回
+            </a>
         </div>
     </nav>
 
-    <div class="container">
+    <div class="container container-main">
         <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="card shadow-sm">
+            <div class="col-md-6 col-lg-5">
+                <div class="card">
                     <div class="card-body">
-                        <h3 class="card-title mb-3">建立團隊</h3>
-                        <?php if($msg):?><div class="alert alert-info"><?php echo htmlspecialchars($msg);?></div><?php endif;?>
+                        <div class="text-center mb-4">
+                          <div class="auth-logo" style="margin: 0 auto 1rem;">
+                            <i class="fas fa-users"></i>
+                          </div>
+                          <h3 class="card-title justify-content-center">建立團隊</h3>
+                          <p class="text-muted">創建您的健康任務團隊</p>
+                        </div>
+                        <?php if($msg):?>
+                          <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i><?php echo htmlspecialchars($msg);?>
+                          </div>
+                        <?php endif;?>
                         <form method="post">
-                            <div class="mb-3">
+                            <div class="mb-4">
                                 <label class="form-label">團隊名稱</label>
-                                <input name="name" class="form-control" required>
+                                <input name="name" class="form-control" placeholder="輸入團隊名稱" required>
                             </div>
                             <div class="d-grid">
-                                <button class="btn btn-success" type="submit">建立團隊</button>
+                                <button class="btn btn-primary btn-lg" type="submit">
+                                  <i class="fas fa-plus-circle me-2"></i>建立團隊
+                                </button>
                             </div>
                         </form>
-                        <hr>
-                        <p class="mb-0"><a href="index.php">回首頁</a></p>
                     </div>
                 </div>
             </div>

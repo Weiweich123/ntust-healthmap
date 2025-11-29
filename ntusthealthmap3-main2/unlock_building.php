@@ -37,6 +37,15 @@ try {
     $stmt = $pdo->prepare('INSERT INTO user_buildings (user_id,building_id,level,unlocked_at) VALUES (?,?,?,NOW())');
     $stmt->execute([$uid,$bid,1]);
 
+    // 記錄金錢獲得紀錄
+    $stmt = $pdo->prepare('SELECT name FROM buildings WHERE building_id = ?');
+    $stmt->execute([$bid]);
+    $building = $stmt->fetch();
+    $building_name = $building ? $building['name'] : '建築';
+    
+    $stmt = $pdo->prepare('INSERT INTO money_logs (user_id, amount, source, description, related_id) VALUES (?, ?, ?, ?, ?)');
+    $stmt->execute([$uid, $b['reward_money'], 'building_unlock', "解鎖 {$building_name}", $bid]);
+
     $pdo->commit();
     // return updated level and user points/money for front-end convenience
     $stmt = $pdo->prepare('SELECT points,money FROM users WHERE user_id = ?');
