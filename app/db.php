@@ -16,7 +16,7 @@ if (file_exists($configFile)) {
         'port' => getenv('DB_PORT') ?: getenv('TIDB_PORT') ?: '3306',
         'database' => getenv('DB_NAME') ?: getenv('TIDB_DATABASE') ?: 'ntust_healthmap',
         'username' => getenv('DB_USER') ?: getenv('TIDB_USER') ?: 'root',
-        'password' => getenv('DB_PASS') ?: getenv('TIDB_PASSWORD') ?: '',
+        'password' => getenv('DB_PASS') ?: getenv('TIDB_PASS') ?: getenv('TIDB_PASSWORD') ?: '',
         'use_ssl' => (getenv('DB_USE_SSL') === 'true' || getenv('TIDB_USE_SSL') === 'true'),
         'ssl_ca' => getenv('DB_SSL_CA') ?: getenv('TIDB_SSL_CA') ?: __DIR__ . '/isrgrootx1.pem',
     ];
