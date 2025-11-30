@@ -101,16 +101,27 @@ $stmt = $pdo->prepare('
 $stmt->execute([$user_id, $start_date, $end_date]);
 $building_records = $stmt->fetchAll();
 
-// 查詢詳細的點數紀錄列表
+// 查詢詳細的點數紀錄列表 - 合併 points_logs 和舊 activities 資料
 $stmt = $pdo->prepare('
-    SELECT log_id, amount, source, description, created_at
+    SELECT log_id as id, amount, source, description, created_at
     FROM points_logs
     WHERE user_id = ?
     AND DATE(created_at) BETWEEN ? AND ?
+
+    UNION ALL
+
+    SELECT activity_id as id, points_earned as amount, "activity" as source,
+           CONCAT(activity_type, " ", duration_minutes, "分鐘") as description,
+           activity_date as created_at
+    FROM activities
+    WHERE user_id = ?
+    AND activity_date BETWEEN ? AND ?
+    AND activity_id NOT IN (SELECT COALESCE(related_id, 0) FROM points_logs WHERE user_id = ? AND source = "activity")
+
     ORDER BY created_at DESC
     LIMIT 100
 ');
-$stmt->execute([$user_id, $start_date, $end_date]);
+$stmt->execute([$user_id, $start_date, $end_date, $user_id, $start_date, $end_date, $user_id]);
 $detailed_points_logs = $stmt->fetchAll();
 
 // 合併並按日期分組
