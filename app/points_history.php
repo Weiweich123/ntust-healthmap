@@ -24,37 +24,35 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_date)) {
     $end_date = $default_end;
 }
 
-// 查詢點數紀錄（優先使用 points_logs，若無則用 activities）
+// 查詢點數紀錄 - 合併 points_logs 和 activities 兩個來源
+// 1. 從 points_logs 取得點數
 $stmt = $pdo->prepare('
-    SELECT SUM(amount) as total_points
+    SELECT COALESCE(SUM(amount), 0) as total_points
     FROM points_logs
     WHERE user_id = ?
     AND DATE(created_at) BETWEEN ? AND ?
 ');
 $stmt->execute([$user_id, $start_date, $end_date]);
-$points_log_summary = $stmt->fetch();
+$points_from_logs = (int)($stmt->fetch()['total_points'] ?? 0);
 
-// 如果 points_logs 沒有資料，使用 activities
-if (empty($points_log_summary['total_points'])) {
-    $stmt = $pdo->prepare('
-        SELECT SUM(points_earned) as total_points
-        FROM activities
-        WHERE user_id = ?
-        AND activity_date BETWEEN ? AND ?
-    ');
-    $stmt->execute([$user_id, $start_date, $end_date]);
-    $activity_summary = $stmt->fetch();
-    $total_points = (int)($activity_summary['total_points'] ?? 0);
-} else {
-    $total_points = (int)($points_log_summary['total_points'] ?? 0);
-}
+// 2. 從 activities 取得點數（舊資料，沒有記錄到 points_logs 的）
+$stmt = $pdo->prepare('
+    SELECT COALESCE(SUM(points_earned), 0) as total_points
+    FROM activities
+    WHERE user_id = ?
+    AND activity_date BETWEEN ? AND ?
+    AND activity_id NOT IN (SELECT COALESCE(related_id, 0) FROM points_logs WHERE user_id = ? AND source = "activity")
+');
+$stmt->execute([$user_id, $start_date, $end_date, $user_id]);
+$points_from_activities = (int)($stmt->fetch()['total_points'] ?? 0);
+
+$total_points = $points_from_logs + $points_from_activities;
 
 // 查詢建築相關獲得的金錢（解鎖 + 升級）
 $stmt = $pdo->prepare('
-    SELECT SUM(amount) as total_building_money
+    SELECT COALESCE(SUM(amount), 0) as total_building_money
     FROM money_logs
     WHERE user_id = ?
-    AND source IN ("building_unlock", "building_upgrade")
     AND DATE(created_at) BETWEEN ? AND ?
 ');
 $stmt->execute([$user_id, $start_date, $end_date]);
@@ -62,7 +60,8 @@ $building_summary = $stmt->fetch();
 
 $total_money = (int)($building_summary['total_building_money'] ?? 0);
 
-// 查詢點數明細（優先使用 points_logs）
+// 查詢每日點數明細 - 合併兩個來源
+// 從 points_logs
 $stmt = $pdo->prepare('
     SELECT
         DATE(created_at) as record_date,
@@ -75,20 +74,19 @@ $stmt = $pdo->prepare('
 $stmt->execute([$user_id, $start_date, $end_date]);
 $points_log_records = $stmt->fetchAll();
 
-// 如果沒有 points_logs 資料，使用 activities
-if (empty($points_log_records)) {
-    $stmt = $pdo->prepare('
-        SELECT
-            activity_date as record_date,
-            SUM(points_earned) as daily_points
-        FROM activities
-        WHERE user_id = ?
-        AND activity_date BETWEEN ? AND ?
-        GROUP BY activity_date
-    ');
-    $stmt->execute([$user_id, $start_date, $end_date]);
-    $points_log_records = $stmt->fetchAll();
-}
+// 從 activities（舊資料）
+$stmt = $pdo->prepare('
+    SELECT
+        activity_date as record_date,
+        SUM(points_earned) as daily_points
+    FROM activities
+    WHERE user_id = ?
+    AND activity_date BETWEEN ? AND ?
+    AND activity_id NOT IN (SELECT COALESCE(related_id, 0) FROM points_logs WHERE user_id = ? AND source = "activity")
+    GROUP BY activity_date
+');
+$stmt->execute([$user_id, $start_date, $end_date, $user_id]);
+$activity_records = $stmt->fetchAll();
 
 // 查詢建築每日金錢明細
 $stmt = $pdo->prepare('
@@ -97,7 +95,6 @@ $stmt = $pdo->prepare('
         SUM(amount) as daily_money
     FROM money_logs
     WHERE user_id = ?
-    AND source IN ("building_unlock", "building_upgrade")
     AND DATE(created_at) BETWEEN ? AND ?
     GROUP BY DATE(created_at)
 ');
@@ -118,6 +115,7 @@ $detailed_points_logs = $stmt->fetchAll();
 
 // 合併並按日期分組
 $daily_data = [];
+// 合併 points_logs 的記錄
 foreach ($points_log_records as $r) {
     $date = $r['record_date'];
     if (!isset($daily_data[$date])) {
@@ -125,6 +123,15 @@ foreach ($points_log_records as $r) {
     }
     $daily_data[$date]['points'] += (int)$r['daily_points'];
 }
+// 合併 activities 的舊記錄
+foreach ($activity_records as $r) {
+    $date = $r['record_date'];
+    if (!isset($daily_data[$date])) {
+        $daily_data[$date] = ['points' => 0, 'money' => 0];
+    }
+    $daily_data[$date]['points'] += (int)$r['daily_points'];
+}
+// 合併金錢記錄
 foreach ($building_records as $r) {
     $date = $r['record_date'];
     if (!isset($daily_data[$date])) {
