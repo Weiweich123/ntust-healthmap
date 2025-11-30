@@ -235,7 +235,7 @@ $pending_team_invites = (int)$stmt->fetchColumn();
 
     // 地圖初始化，鎖定在台科大校園範圍
     const map = L.map('map', {
-      center: [25.0115, 121.5400],
+      center: [25.0135, 121.5425],
       zoom: 17,
       minZoom: 16,
       maxZoom: 19,
