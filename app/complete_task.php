@@ -44,6 +44,11 @@ try {
     $upd2 = $pdo->prepare('UPDATE users SET points = points + ? WHERE user_id=?');
     $upd2->execute([$pts,$user_id]);
 
+    // 記錄點數變動到 points_logs
+    $desc = '完成團隊任務：' . $task['title'];
+    $stmt = $pdo->prepare('INSERT INTO points_logs (user_id, amount, source, description, related_id, created_at) VALUES (?, ?, "team_task", ?, ?, NOW())');
+    $stmt->execute([$user_id, $pts, $desc, $team_id]);
+
     // create a new random task for the team
     $pool = [
         ['title'=>'團隊步行 5000 步','points'=>10],
