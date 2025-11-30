@@ -111,7 +111,7 @@ $stmt = $pdo->prepare('
     UNION ALL
 
     SELECT activity_id as id, points_earned as amount, "activity" as source,
-           CONCAT(activity_type, " ", duration_minutes, "分鐘") as description,
+           CONCAT("步數:", steps, " 運動:", time_minutes, "分 喝水:", water_ml, "ml") as description,
            activity_date as created_at
     FROM activities
     WHERE user_id = ?
