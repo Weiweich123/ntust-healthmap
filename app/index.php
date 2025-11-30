@@ -227,8 +227,21 @@ $pending_team_invites = (int)$stmt->fetchColumn();
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    // 國立台灣科技大學中心座標
-    const map = L.map('map').setView([25.0130, 121.5415], 16);
+    // 國立台灣科技大學校園邊界
+    const ntustBounds = L.latLngBounds(
+      [25.0085, 121.5355],  // 西南角 (左下)
+      [25.0175, 121.5475]   // 東北角 (右上)
+    );
+    
+    // 地圖初始化，鎖定在台科大校園範圍
+    const map = L.map('map', {
+      center: [25.0130, 121.5415],
+      zoom: 17,
+      minZoom: 16,
+      maxZoom: 19,
+      maxBounds: ntustBounds.pad(0.1),  // 加一點緩衝區
+      maxBoundsViscosity: 1.0  // 完全限制在邊界內
+    });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
     const userBuildings = <?php echo json_encode($ub_levels, JSON_HEX_TAG); ?>;
