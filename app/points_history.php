@@ -221,19 +221,35 @@ krsort($daily_data);
 
             <!-- 統計摘要 -->
             <div class="row g-3 mb-4">
-              <div class="col-md-6">
+              <div class="col-md-3">
                 <div class="card bg-primary text-white">
                   <div class="card-body text-center">
                     <h3 class="mb-1"><?php echo number_format($total_points); ?></h3>
-                    <div><i class="fas fa-star me-1"></i>獲得點數</div>
+                    <div><i class="fas fa-star me-1"></i>區間內獲得點數</div>
                   </div>
                 </div>
               </div>
-              <div class="col-md-6">
+              <div class="col-md-3">
                 <div class="card bg-success text-white">
                   <div class="card-body text-center">
                     <h3 class="mb-1"><?php echo number_format($total_money); ?></h3>
-                    <div><i class="fas fa-coins me-1"></i>獲得金錢</div>
+                    <div><i class="fas fa-coins me-1"></i>區間內獲得金錢</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card bg-info text-white">
+                  <div class="card-body text-center">
+                    <h3 class="mb-1"><?php echo number_format((int)$user['points']); ?></h3>
+                    <div><i class="fas fa-trophy me-1"></i>目前總點數</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card bg-warning text-dark">
+                  <div class="card-body text-center">
+                    <h3 class="mb-1"><?php echo number_format((int)$user['money']); ?></h3>
+                    <div><i class="fas fa-wallet me-1"></i>目前總金錢</div>
                   </div>
                 </div>
               </div>
