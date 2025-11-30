@@ -42,6 +42,20 @@ try {
     $stmt = $pdo->prepare('UPDATE users SET points = points + ? WHERE user_id = ?');
     $stmt->execute([$points,$user_id]);
 
+    // team bonus: if user belongs to a team, give small extra points to team members (simple implementation)
+    $stmt = $pdo->prepare('SELECT team_id FROM team_members WHERE user_id = ? LIMIT 1');
+    $stmt->execute([$user_id]);
+    $tm = $stmt->fetch();
+    if ($tm) {
+        // give each team member +1 point
+        $stmt = $pdo->prepare('SELECT user_id FROM team_members WHERE team_id = ?');
+        $stmt->execute([$tm['team_id']]);
+        $members = $stmt->fetchAll();
+        foreach ($members as $m) {
+            $pdo->prepare('UPDATE users SET points = points + 1 WHERE user_id = ?')->execute([$m['user_id']]);
+        }
+    }
+
     $pdo->commit();
     header('Location: index.php'); exit;
 } catch (Exception $e) {
