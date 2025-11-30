@@ -98,8 +98,8 @@ switch ($action) {
         $stmt->execute([$user_id, $friend_id, $message_type, $content]);
         $message_id = $pdo->lastInsertId();
 
-        // 取得剛插入的訊息
-        $stmt = $pdo->prepare('SELECT * FROM chat_messages WHERE message_id = ?');
+        // 取得剛插入的訊息（轉換為台北時間）
+        $stmt = $pdo->prepare('SELECT message_id, sender_id, receiver_id, message_type, content, is_read, DATE_ADD(created_at, INTERVAL 8 HOUR) AS created_at FROM chat_messages WHERE message_id = ?');
         $stmt->execute([$message_id]);
         $message = $stmt->fetch(PDO::FETCH_ASSOC);
 

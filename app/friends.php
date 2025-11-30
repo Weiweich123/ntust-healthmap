@@ -646,32 +646,53 @@ foreach ($friends as $friend) {
     }
 
     // 發送訊息
-    function sendMessage() {
+    let isSending = false;
+    function sendMessage(retryCount = 0) {
       const input = document.getElementById('chatInput');
       const content = input.value.trim();
-      if (!content || !currentFriendId) return;
+      if (!content || !currentFriendId || isSending) return;
 
+      isSending = true;
       input.disabled = true;
       document.getElementById('sendBtn').disabled = true;
+      document.getElementById('sendBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
       fetch('chat_api.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'action=send_message&friend_id=' + currentFriendId + '&content=' + encodeURIComponent(content)
       })
-        .then(r => r.json())
+        .then(r => {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
         .then(data => {
           if (data.success) {
             input.value = '';
-            // 訊息會透過輪詢自動顯示
+            // 立即顯示已發送的訊息（不等輪詢）
+            if (data.message) {
+              appendMessage(data.message, <?php echo $user_id; ?>);
+              lastMessageId = Math.max(lastMessageId, parseInt(data.message.message_id));
+              scrollToBottom();
+            }
           } else {
-            alert(data.message);
+            alert(data.message || '發送失敗');
           }
         })
-        .catch(err => alert('發送失敗'))
+        .catch(err => {
+          console.error('發送錯誤:', err);
+          // 自動重試一次
+          if (retryCount < 1) {
+            setTimeout(() => sendMessage(retryCount + 1), 1000);
+            return;
+          }
+          alert('發送失敗，請檢查網路連線後再試');
+        })
         .finally(() => {
+          isSending = false;
           input.disabled = false;
           document.getElementById('sendBtn').disabled = false;
+          document.getElementById('sendBtn').innerHTML = '<i class="fas fa-paper-plane"></i>';
           input.focus();
         });
     }
