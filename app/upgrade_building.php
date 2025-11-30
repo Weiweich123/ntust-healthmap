@@ -29,22 +29,28 @@ try {
     $u = $stmt->fetch();
     if ($u['points'] < $upgrade_cost) throw new Exception('點數不足升級');
 
+    // 取得建築名稱
+    $stmt = $pdo->prepare('SELECT name FROM buildings WHERE building_id = ?');
+    $stmt->execute([$bid]);
+    $building = $stmt->fetch();
+    $building_name = $building ? $building['name'] : '建築';
+
     // deduct points and increase level and reward money proportionally
     $reward = floor($upgrade_cost / 2);
+    $new_level = $level + 1;
     $stmt = $pdo->prepare('UPDATE users SET points = points - ?, money = money + ? WHERE user_id = ?');
     $stmt->execute([$upgrade_cost, $reward, $uid]);
 
     $stmt = $pdo->prepare('UPDATE user_buildings SET level = level + 1 WHERE user_id = ? AND building_id = ?');
     $stmt->execute([$uid,$bid]);
 
+    // 記錄扣除點數紀錄
+    $stmt = $pdo->prepare('INSERT INTO points_logs (user_id, amount, source, description, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())');
+    $stmt->execute([$uid, -$upgrade_cost, 'building_upgrade', "升級建築：{$building_name} 至等級 {$new_level}（花費 {$upgrade_cost} 點）", $bid]);
+
     // 記錄金錢獲得紀錄
-    $stmt = $pdo->prepare('SELECT name FROM buildings WHERE building_id = ?');
-    $stmt->execute([$bid]);
-    $building = $stmt->fetch();
-    $building_name = $building ? $building['name'] : '建築';
-    
     $stmt = $pdo->prepare('INSERT INTO money_logs (user_id, amount, source, description, related_id) VALUES (?, ?, ?, ?, ?)');
-    $stmt->execute([$uid, $reward, 'building_upgrade', "升級 {$building_name} 至等級 " . ($level + 1), $bid]);
+    $stmt->execute([$uid, $reward, 'building_upgrade', "升級建築：{$building_name} 至等級 {$new_level}（獲得 {$reward} 元）", $bid]);
 
     $pdo->commit();
     // return updated level and user balances

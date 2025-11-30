@@ -30,6 +30,12 @@ try {
     $stmt->execute([$uid,$bid]);
     if ($stmt->fetch()) throw new Exception('已解鎖');
 
+    // 取得建築名稱
+    $stmt = $pdo->prepare('SELECT name FROM buildings WHERE building_id = ?');
+    $stmt->execute([$bid]);
+    $building = $stmt->fetch();
+    $building_name = $building ? $building['name'] : '建築';
+
     // deduct points, add money, insert user_buildings
     $stmt = $pdo->prepare('UPDATE users SET points = points - ?, money = money + ? WHERE user_id = ?');
     $stmt->execute([$b['unlock_cost'], $b['reward_money'], $uid]);
@@ -37,14 +43,13 @@ try {
     $stmt = $pdo->prepare('INSERT INTO user_buildings (user_id,building_id,level,unlocked_at) VALUES (?,?,?,NOW())');
     $stmt->execute([$uid,$bid,1]);
 
+    // 記錄扣除點數紀錄
+    $stmt = $pdo->prepare('INSERT INTO points_logs (user_id, amount, source, description, related_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())');
+    $stmt->execute([$uid, -$b['unlock_cost'], 'building_unlock', "解鎖建築：{$building_name}（花費 {$b['unlock_cost']} 點）", $bid]);
+
     // 記錄金錢獲得紀錄
-    $stmt = $pdo->prepare('SELECT name FROM buildings WHERE building_id = ?');
-    $stmt->execute([$bid]);
-    $building = $stmt->fetch();
-    $building_name = $building ? $building['name'] : '建築';
-    
     $stmt = $pdo->prepare('INSERT INTO money_logs (user_id, amount, source, description, related_id) VALUES (?, ?, ?, ?, ?)');
-    $stmt->execute([$uid, $b['reward_money'], 'building_unlock', "解鎖 {$building_name}", $bid]);
+    $stmt->execute([$uid, $b['reward_money'], 'building_unlock', "解鎖建築：{$building_name}（獲得 {$b['reward_money']} 元）", $bid]);
 
     $pdo->commit();
     // return updated level and user points/money for front-end convenience

@@ -124,6 +124,18 @@ $stmt = $pdo->prepare('
 $stmt->execute([$user_id, $start_date, $end_date, $user_id, $start_date, $end_date, $user_id]);
 $detailed_points_logs = $stmt->fetchAll();
 
+// 查詢詳細的金錢紀錄列表
+$stmt = $pdo->prepare('
+    SELECT log_id as id, amount, source, description, created_at
+    FROM money_logs
+    WHERE user_id = ?
+    AND DATE(created_at) BETWEEN ? AND ?
+    ORDER BY created_at DESC
+    LIMIT 100
+');
+$stmt->execute([$user_id, $start_date, $end_date]);
+$detailed_money_logs = $stmt->fetchAll();
+
 // 合併並按日期分組
 $daily_data = [];
 // 合併 points_logs 的記錄
@@ -295,6 +307,8 @@ krsort($daily_data);
                       'activity' => '<span class="badge bg-primary">運動</span>',
                       'team_bonus' => '<span class="badge bg-info">團隊獎勵</span>',
                       'team_task' => '<span class="badge bg-warning text-dark">團隊任務</span>',
+                      'building_unlock' => '<span class="badge bg-danger">解鎖建築</span>',
+                      'building_upgrade' => '<span class="badge bg-purple" style="background-color: #6f42c1;">升級建築</span>',
                       'other' => '<span class="badge bg-secondary">其他</span>',
                     ];
                     $source_label = $source_labels[$log['source']] ?? '<span class="badge bg-secondary">' . htmlspecialchars($log['source']) . '</span>';
@@ -305,6 +319,42 @@ krsort($daily_data);
                     <td><?php echo htmlspecialchars($log['description'] ?? '-'); ?></td>
                     <td class="text-end <?php echo $log['amount'] >= 0 ? 'text-success' : 'text-danger'; ?>">
                       <?php echo ($log['amount'] >= 0 ? '+' : '') . number_format($log['amount']); ?>
+                    </td>
+                  </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+            <?php endif; ?>
+
+            <!-- 詳細金錢紀錄 -->
+            <?php if (!empty($detailed_money_logs)): ?>
+            <h5 class="mb-3 mt-4"><i class="fas fa-coins me-2" style="color: var(--success);"></i>詳細金錢紀錄</h5>
+            <div class="table-responsive">
+              <table class="table table-hover table-sm">
+                <thead>
+                  <tr>
+                    <th>時間</th>
+                    <th>來源</th>
+                    <th>說明</th>
+                    <th class="text-end">金額</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($detailed_money_logs as $log):
+                    $money_source_labels = [
+                      'building_unlock' => '<span class="badge bg-success">解鎖建築</span>',
+                      'building_upgrade' => '<span class="badge bg-info">升級建築</span>',
+                      'other' => '<span class="badge bg-secondary">其他</span>',
+                    ];
+                    $source_label = $money_source_labels[$log['source']] ?? '<span class="badge bg-secondary">' . htmlspecialchars($log['source']) . '</span>';
+                  ?>
+                  <tr>
+                    <td><?php echo date('m/d H:i', strtotime($log['created_at'])); ?></td>
+                    <td><?php echo $source_label; ?></td>
+                    <td><?php echo htmlspecialchars($log['description'] ?? '-'); ?></td>
+                    <td class="text-end text-success">
+                      +<?php echo number_format($log['amount']); ?>
                     </td>
                   </tr>
                   <?php endforeach; ?>
