@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $stmt = $pdo->prepare('SELECT user_id FROM users WHERE username = ?');
             $stmt->execute([$friend_username]);
             $friend = $stmt->fetch();
-
+            
             if (!$friend) {
                 $error = '找不到此用戶';
             } elseif ($friend['user_id'] == $user_id) {
@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $stmt = $pdo->prepare('SELECT * FROM friendships WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)');
                 $stmt->execute([$user_id, $friend['user_id'], $friend['user_id'], $user_id]);
                 $existing = $stmt->fetch();
-
+                
                 if ($existing) {
                     if ($existing['status'] === 'accepted') {
                         $error = '你們已經是好友了';
@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     } elseif ($_POST['action'] === 'invite_to_team') {
         $friend_id = (int)($_POST['friend_id'] ?? 0);
         $team_id = (int)($_POST['team_id'] ?? 0);
-
+        
         // 確認是好友
         $stmt = $pdo->prepare('SELECT * FROM friendships WHERE ((user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)) AND status = "accepted"');
         $stmt->execute([$user_id, $friend_id, $friend_id, $user_id]);
@@ -132,15 +132,15 @@ foreach ($friends as $friend) {
     $stmt = $pdo->prepare('SELECT team_id FROM team_members WHERE user_id = ?');
     $stmt->execute([$friend_id]);
     $friend_team_ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
+    
     // 獲取好友是擁有者的團隊 ID
     $stmt = $pdo->prepare('SELECT team_id FROM team_members WHERE user_id = ? AND role = "owner"');
     $stmt->execute([$friend_id]);
     $friend_owner_team_ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
+    
     // 合併排除的團隊 ID
     $excluded_team_ids = array_unique(array_merge($friend_team_ids, $friend_owner_team_ids));
-
+    
     // 過濾出可邀請的團隊
     $available_teams = [];
     foreach ($my_teams as $team) {
@@ -279,7 +279,7 @@ foreach ($friends as $friend) {
   <div class="container container-main">
     <div class="row justify-content-center">
       <div class="col-lg-10">
-
+        
         <?php if ($message): ?>
           <div class="alert alert-success"><i class="fas fa-check-circle me-2"></i><?php echo htmlspecialchars($message); ?></div>
         <?php endif; ?>
@@ -354,7 +354,7 @@ foreach ($friends as $friend) {
               <i class="fas fa-users"></i>我的好友
               <span class="badge bg-primary ms-2"><?php echo count($friends); ?></span>
             </h5>
-
+            
             <?php if (count($friends) === 0): ?>
               <div class="alert alert-info mb-0">
                 <i class="fas fa-info-circle me-2"></i>你還沒有好友，快去邀請朋友加入吧！
@@ -392,8 +392,8 @@ foreach ($friends as $friend) {
                       </div>
                       <?php endif; ?>
                       <!-- 聊天按鈕 -->
-                      <button type="button" class="btn btn-outline-info btn-sm position-relative chat-btn"
-                              data-friend-id="<?php echo $friend['user_id']; ?>"
+                      <button type="button" class="btn btn-outline-info btn-sm position-relative chat-btn" 
+                              data-friend-id="<?php echo $friend['user_id']; ?>" 
                               data-friend-name="<?php echo htmlspecialchars($friend['display_name'] ?? $friend['username']); ?>"
                               data-bs-toggle="modal" data-bs-target="#chatModal">
                         <i class="fas fa-comments"></i>
@@ -552,7 +552,7 @@ foreach ($friends as $friend) {
     function loadMessages() {
       const container = document.getElementById('chatMessages');
       container.innerHTML = '<div class="text-center text-muted py-5"><i class="fas fa-spinner fa-spin me-2"></i>載入中...</div>';
-
+      
       fetch('chat_api.php?action=get_messages&friend_id=' + currentFriendId)
         .then(r => r.json())
         .then(data => {
@@ -588,23 +588,20 @@ foreach ($friends as $friend) {
       const div = document.createElement('div');
       div.className = 'message-bubble ' + (isSent ? 'message-sent' : 'message-received');
       div.dataset.messageId = msg.message_id;
-
+      
       let content = '';
       if (msg.message_type === 'voice') {
         content = '<div class="message-voice"><i class="fas fa-volume-up"></i><audio controls src="' + escapeHtml(msg.content) + '"></audio></div>';
       } else {
         content = escapeHtml(msg.content);
       }
-
-      // 直接解析時間字串，避免時區轉換問題
-      const timeStr = msg.created_at; // 格式: "2025-11-30 15:48:00"
-      const timePart = timeStr.split(' ')[1]; // "15:48:00"
-      const time = timePart ? timePart.substring(0, 5) : ''; // "15:48"
-
-      div.innerHTML = content +
+      
+      const time = new Date(msg.created_at).toLocaleTimeString('zh-TW', {hour: '2-digit', minute: '2-digit'});
+      
+      div.innerHTML = content + 
         '<div class="message-time">' + time + '</div>' +
-        (isSent ? '<div class="message-read-status">' + (msg.is_read === 'Read' || msg.is_read === 1 || msg.is_read === '1' ? '已讀' : '') + '</div>' : '');
-
+        (isSent ? '<div class="message-read-status">' + (msg.is_read === 'Read' ? '已讀' : '') + '</div>' : '');
+      
       container.appendChild(div);
     }
 
@@ -617,7 +614,7 @@ foreach ($friends as $friend) {
     // 檢查新訊息
     function checkNewMessages() {
       if (!currentFriendId) return;
-
+      
       fetch('chat_api.php?action=check_new_messages&friend_id=' + currentFriendId + '&last_message_id=' + lastMessageId)
         .then(r => r.json())
         .then(data => {
@@ -650,10 +647,10 @@ foreach ($friends as $friend) {
       const input = document.getElementById('chatInput');
       const content = input.value.trim();
       if (!content || !currentFriendId) return;
-
+      
       input.disabled = true;
       document.getElementById('sendBtn').disabled = true;
-
+      
       fetch('chat_api.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -692,25 +689,25 @@ foreach ($friends as $friend) {
       if (mediaRecorder && mediaRecorder.state === 'recording') {
         return; // 已在錄音中
       }
-
+      
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
         audioChunks = [];
-
+        
         mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-
+        
         mediaRecorder.onstop = () => {
           stream.getTracks().forEach(track => track.stop());
           const blob = new Blob(audioChunks, { type: 'audio/webm' });
           uploadVoice(blob);
         };
-
+        
         mediaRecorder.start();
         recordingStartTime = Date.now();
         document.getElementById('recordingIndicator').classList.add('active');
         this.disabled = true;
-
+        
         // 更新錄音時間
         recordingTimer = setInterval(() => {
           const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
@@ -718,7 +715,7 @@ foreach ($friends as $friend) {
           const sec = elapsed % 60;
           document.getElementById('recordingTime').textContent = min + ':' + (sec < 10 ? '0' : '') + sec;
         }, 1000);
-
+        
       } catch (err) {
         alert('無法存取麥克風');
       }
@@ -740,7 +737,7 @@ foreach ($friends as $friend) {
       formData.append('action', 'upload_voice');
       formData.append('friend_id', currentFriendId);
       formData.append('voice', blob, 'voice.webm');
-
+      
       fetch('chat_api.php', {
         method: 'POST',
         body: formData
