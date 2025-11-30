@@ -37,10 +37,18 @@ try {
     // Always insert a new activity record (keep history)
     $stmt = $pdo->prepare('INSERT INTO activities (user_id, activity_date, steps, time_minutes, water_ml, points_earned, money_earned, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())');
     $stmt->execute([$user_id, $activity_date, $steps, $time_minutes, $water_ml, $points, $money]);
+    $activity_id = $pdo->lastInsertId();
 
     // add to user's points total only (money not awarded via activity submissions)
     $stmt = $pdo->prepare('UPDATE users SET points = points + ? WHERE user_id = ?');
     $stmt->execute([$points,$user_id]);
+
+    // 記錄點數變動到 points_logs
+    if ($points > 0) {
+        $desc = sprintf('運動記錄：%d步、%d分鐘、%dml水', $steps, $time_minutes, $water_ml);
+        $stmt = $pdo->prepare('INSERT INTO points_logs (user_id, amount, source, description, related_id, created_at) VALUES (?, ?, "activity", ?, ?, NOW())');
+        $stmt->execute([$user_id, $points, $desc, $activity_id]);
+    }
 
     $pdo->commit();
     header('Location: index.php'); exit;

@@ -24,50 +24,79 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_date)) {
     $end_date = $default_end;
 }
 
-// 查詢活動紀錄中的點數
+// 查詢點數紀錄（優先使用 points_logs，若無則用 activities）
 $stmt = $pdo->prepare('
-    SELECT SUM(points_earned) as total_points
-    FROM activities 
-    WHERE user_id = ? 
-    AND activity_date BETWEEN ? AND ?
+    SELECT SUM(amount) as total_points
+    FROM points_logs
+    WHERE user_id = ?
+    AND DATE(created_at) BETWEEN ? AND ?
 ');
 $stmt->execute([$user_id, $start_date, $end_date]);
-$activity_summary = $stmt->fetch();
+$points_log_summary = $stmt->fetch();
+
+// 如果 points_logs 沒有資料，使用 activities
+if (empty($points_log_summary['total_points'])) {
+    $stmt = $pdo->prepare('
+        SELECT SUM(points_earned) as total_points
+        FROM activities
+        WHERE user_id = ?
+        AND activity_date BETWEEN ? AND ?
+    ');
+    $stmt->execute([$user_id, $start_date, $end_date]);
+    $activity_summary = $stmt->fetch();
+    $total_points = (int)($activity_summary['total_points'] ?? 0);
+} else {
+    $total_points = (int)($points_log_summary['total_points'] ?? 0);
+}
 
 // 查詢建築相關獲得的金錢（解鎖 + 升級）
 $stmt = $pdo->prepare('
     SELECT SUM(amount) as total_building_money
-    FROM money_logs 
-    WHERE user_id = ? 
+    FROM money_logs
+    WHERE user_id = ?
     AND source IN ("building_unlock", "building_upgrade")
     AND DATE(created_at) BETWEEN ? AND ?
 ');
 $stmt->execute([$user_id, $start_date, $end_date]);
 $building_summary = $stmt->fetch();
 
-$total_points = (int)($activity_summary['total_points'] ?? 0);
 $total_money = (int)($building_summary['total_building_money'] ?? 0);
 
-// 查詢活動每日點數明細
+// 查詢點數明細（優先使用 points_logs）
 $stmt = $pdo->prepare('
-    SELECT 
-        activity_date as record_date,
-        SUM(points_earned) as daily_points
-    FROM activities 
-    WHERE user_id = ? 
-    AND activity_date BETWEEN ? AND ?
-    GROUP BY activity_date
+    SELECT
+        DATE(created_at) as record_date,
+        SUM(amount) as daily_points
+    FROM points_logs
+    WHERE user_id = ?
+    AND DATE(created_at) BETWEEN ? AND ?
+    GROUP BY DATE(created_at)
 ');
 $stmt->execute([$user_id, $start_date, $end_date]);
-$activity_records = $stmt->fetchAll();
+$points_log_records = $stmt->fetchAll();
+
+// 如果沒有 points_logs 資料，使用 activities
+if (empty($points_log_records)) {
+    $stmt = $pdo->prepare('
+        SELECT
+            activity_date as record_date,
+            SUM(points_earned) as daily_points
+        FROM activities
+        WHERE user_id = ?
+        AND activity_date BETWEEN ? AND ?
+        GROUP BY activity_date
+    ');
+    $stmt->execute([$user_id, $start_date, $end_date]);
+    $points_log_records = $stmt->fetchAll();
+}
 
 // 查詢建築每日金錢明細
 $stmt = $pdo->prepare('
-    SELECT 
+    SELECT
         DATE(created_at) as record_date,
         SUM(amount) as daily_money
-    FROM money_logs 
-    WHERE user_id = ? 
+    FROM money_logs
+    WHERE user_id = ?
     AND source IN ("building_unlock", "building_upgrade")
     AND DATE(created_at) BETWEEN ? AND ?
     GROUP BY DATE(created_at)
@@ -75,9 +104,21 @@ $stmt = $pdo->prepare('
 $stmt->execute([$user_id, $start_date, $end_date]);
 $building_records = $stmt->fetchAll();
 
+// 查詢詳細的點數紀錄列表
+$stmt = $pdo->prepare('
+    SELECT log_id, amount, source, description, created_at
+    FROM points_logs
+    WHERE user_id = ?
+    AND DATE(created_at) BETWEEN ? AND ?
+    ORDER BY created_at DESC
+    LIMIT 100
+');
+$stmt->execute([$user_id, $start_date, $end_date]);
+$detailed_points_logs = $stmt->fetchAll();
+
 // 合併並按日期分組
 $daily_data = [];
-foreach ($activity_records as $r) {
+foreach ($points_log_records as $r) {
     $date = $r['record_date'];
     if (!isset($daily_data[$date])) {
         $daily_data[$date] = ['points' => 0, 'money' => 0];
@@ -133,7 +174,7 @@ krsort($daily_data);
             <h4 class="card-title mb-4">
               <i class="fas fa-chart-line me-2" style="color: var(--primary);"></i>點數金錢紀錄查詢
             </h4>
-            
+
             <!-- 時間區間查詢表單 -->
             <form method="get" class="row g-3 mb-4">
               <div class="col-md-5">
@@ -214,6 +255,43 @@ krsort($daily_data);
             <?php else: ?>
             <div class="alert alert-info text-center">
               <i class="fas fa-info-circle me-2"></i>此期間內沒有任何紀錄
+            </div>
+            <?php endif; ?>
+
+            <!-- 詳細點數紀錄 -->
+            <?php if (!empty($detailed_points_logs)): ?>
+            <h5 class="mb-3 mt-4"><i class="fas fa-history me-2"></i>詳細點數紀錄</h5>
+            <div class="table-responsive">
+              <table class="table table-hover table-sm">
+                <thead>
+                  <tr>
+                    <th>時間</th>
+                    <th>來源</th>
+                    <th>說明</th>
+                    <th class="text-end">點數</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($detailed_points_logs as $log):
+                    $source_labels = [
+                      'activity' => '<span class="badge bg-primary">運動</span>',
+                      'team_bonus' => '<span class="badge bg-info">團隊獎勵</span>',
+                      'team_task' => '<span class="badge bg-warning text-dark">團隊任務</span>',
+                      'other' => '<span class="badge bg-secondary">其他</span>',
+                    ];
+                    $source_label = $source_labels[$log['source']] ?? '<span class="badge bg-secondary">' . htmlspecialchars($log['source']) . '</span>';
+                  ?>
+                  <tr>
+                    <td><?php echo date('m/d H:i', strtotime($log['created_at'])); ?></td>
+                    <td><?php echo $source_label; ?></td>
+                    <td><?php echo htmlspecialchars($log['description'] ?? '-'); ?></td>
+                    <td class="text-end <?php echo $log['amount'] >= 0 ? 'text-success' : 'text-danger'; ?>">
+                      <?php echo ($log['amount'] >= 0 ? '+' : '') . number_format($log['amount']); ?>
+                    </td>
+                  </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
             </div>
             <?php endif; ?>
 

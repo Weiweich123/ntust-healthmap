@@ -94,7 +94,7 @@ $pending_team_invites = (int)$stmt->fetchColumn();
         <span class="badge bg-success">
           <i class="fas fa-coins me-1"></i><?php echo (int)$user['money']; ?> 元
         </span>
-        
+
         <!-- 使用者頭像下拉選單 -->
         <div class="dropdown">
           <button class="btn btn-outline-dark btn-sm dropdown-toggle position-relative" type="button" id="userDropdown" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
@@ -113,6 +113,11 @@ $pending_team_invites = (int)$stmt->fetchColumn();
                 <?php if ($pending_friend_requests > 0): ?>
                 <span class="badge bg-danger ms-2"><?php echo $pending_friend_requests > 99 ? '99+' : $pending_friend_requests; ?></span>
                 <?php endif; ?>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item py-2 d-lg-none" href="points_history.php">
+                <i class="fas fa-chart-line me-2 text-warning"></i>點數及金錢紀錄
               </a>
             </li>
             <li><hr class="dropdown-divider"></li>

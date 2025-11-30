@@ -187,6 +187,21 @@ CREATE TABLE IF NOT EXISTS `money_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================================
+-- 點數紀錄資料表（記錄所有點數變動，包括活動、團隊獎勵等）
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `points_logs` (
+  `log_id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `amount` INT NOT NULL COMMENT '點數變動量（正數為獲得，負數為消耗）',
+  `source` VARCHAR(50) NOT NULL COMMENT 'activity, team_bonus, team_task, other',
+  `description` VARCHAR(255) DEFAULT NULL,
+  `related_id` INT DEFAULT NULL COMMENT '相關ID（如activity_id, team_id）',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_user_date` (`user_id`, `created_at`),
+  KEY `idx_source` (`source`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
 -- 好友聊天訊息資料表
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS `chat_messages` (
