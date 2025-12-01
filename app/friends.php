@@ -650,12 +650,21 @@ foreach ($friends as $friend) {
     function sendMessage(retryCount = 0) {
       const input = document.getElementById('chatInput');
       const content = input.value.trim();
-      if (!content || !currentFriendId || isSending) return;
+      if (!content || !currentFriendId) return;
+      if (isSending && retryCount === 0) return; // 只阻止首次重複點擊
 
       isSending = true;
       input.disabled = true;
       document.getElementById('sendBtn').disabled = true;
       document.getElementById('sendBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+      const resetUI = () => {
+        isSending = false;
+        input.disabled = false;
+        document.getElementById('sendBtn').disabled = false;
+        document.getElementById('sendBtn').innerHTML = '<i class="fas fa-paper-plane"></i>';
+        input.focus();
+      };
 
       fetch('chat_api.php', {
         method: 'POST',
@@ -675,25 +684,26 @@ foreach ($friends as $friend) {
               lastMessageId = Math.max(lastMessageId, parseInt(data.message.message_id));
               scrollToBottom();
             }
+            resetUI();
           } else {
-            alert(data.message || '發送失敗');
+            // 自動重試
+            if (retryCount < 2) {
+              setTimeout(() => sendMessage(retryCount + 1), 500);
+            } else {
+              alert(data.message || '發送失敗');
+              resetUI();
+            }
           }
         })
         .catch(err => {
           console.error('發送錯誤:', err);
-          // 自動重試一次
-          if (retryCount < 1) {
+          // 自動重試最多 3 次
+          if (retryCount < 3) {
             setTimeout(() => sendMessage(retryCount + 1), 1000);
-            return;
+          } else {
+            alert('發送失敗，請檢查網路連線後再試');
+            resetUI();
           }
-          alert('發送失敗，請檢查網路連線後再試');
-        })
-        .finally(() => {
-          isSending = false;
-          input.disabled = false;
-          document.getElementById('sendBtn').disabled = false;
-          document.getElementById('sendBtn').innerHTML = '<i class="fas fa-paper-plane"></i>';
-          input.focus();
         });
     }
 

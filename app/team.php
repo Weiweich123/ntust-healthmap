@@ -16,11 +16,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $membership = $stmt->fetch();
         if ($membership) {
             $was_owner = ($membership['role'] === 'owner');
-            
+
             // 刪除自己
             $stmt = $pdo->prepare('DELETE FROM team_members WHERE team_id = ? AND user_id = ?');
             $stmt->execute([$team_id, $user_id]);
-            
+
             // 如果是擁有者退出，將擁有權轉移給下一位成員
             if ($was_owner) {
                 // 找到下一位成員（按加入順序）
@@ -129,19 +129,19 @@ foreach ($teams as $team) {
   $stmt = $pdo->prepare('SELECT COUNT(*) FROM team_tasks WHERE team_id=? AND completed_at IS NULL');
   $stmt->execute([$team['id']]);
   $cnt = (int)$stmt->fetchColumn();
-  
+
   while ($cnt < 3) {
     $pick = $taskPool[array_rand($taskPool)];
     $ist = $pdo->prepare('INSERT INTO team_tasks (team_id,title,points) VALUES (?,?,?)');
     $ist->execute([$team['id'], $pick['title'], $pick['points']]);
     $cnt++;
   }
-  
+
   // 獲取任務
   $stmt = $pdo->prepare('SELECT task_id,team_id,title,points,created_at FROM team_tasks WHERE team_id=? AND completed_at IS NULL ORDER BY created_at');
   $stmt->execute([$team['id']]);
   $tasks = $stmt->fetchAll();
-  
+
   // 獲取每個任務的確認狀態
   $task_confirmations = [];
   foreach ($tasks as $t) {
@@ -150,18 +150,18 @@ foreach ($teams as $team) {
     $confirmed_users = $stmt->fetchAll(PDO::FETCH_COLUMN);
     $task_confirmations[$t['task_id']] = $confirmed_users;
   }
-  
+
   // 獲取成員
   $stmt = $pdo->prepare('SELECT u.user_id AS id,u.username,u.display_name,tm.role FROM team_members tm JOIN users u ON tm.user_id=u.user_id WHERE tm.team_id=?');
   $stmt->execute([$team['id']]);
   $members = $stmt->fetchAll();
-  
+
   // 獲取自己在此團隊的角色
   $stmt = $pdo->prepare('SELECT role FROM team_members WHERE team_id = ? AND user_id = ?');
   $stmt->execute([$team['id'], $user_id]);
   $my_role_row = $stmt->fetch();
   $my_role = $my_role_row ? $my_role_row['role'] : '';
-  
+
   $teamsData[] = [
     'team' => $team,
     'tasks' => $tasks,
@@ -327,7 +327,7 @@ foreach ($teams as $team) {
                   <span class="badge bg-primary ms-2"><?php echo count($tasks); ?>個任務</span>
                 </h6>
                 <div id="team-tasks-<?php echo $team['id']; ?>" class="row row-cols-1 row-cols-md-3 g-3 mb-4">
-                  <?php foreach($tasks as $t): 
+                  <?php foreach($tasks as $t):
                     $task_id = (int)$t['task_id'];
                     $confirmed_users = $data['task_confirmations'][$task_id] ?? [];
                     $confirmed_count = count($confirmed_users);
@@ -379,7 +379,7 @@ foreach ($teams as $team) {
   <!-- 所有 Modal 放在 body 最外層 -->
   <?php foreach ($teamsData as $data): ?>
     <?php $team = $data['team']; $members = $data['members']; $my_role = $data['my_role']; ?>
-    
+
     <!-- 退出團隊確認 Modal -->
     <div class="modal fade" id="leaveTeamModal<?php echo $team['id']; ?>" tabindex="-1" aria-labelledby="leaveTeamModalLabel<?php echo $team['id']; ?>" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
@@ -406,7 +406,7 @@ foreach ($teams as $team) {
         </div>
       </div>
     </div>
-    
+
     <!-- 踢出成員確認 Modals -->
     <?php if ($my_role === 'owner'): ?>
       <?php foreach ($members as $m): ?>
@@ -495,7 +495,7 @@ foreach ($teams as $team) {
                 btn.classList.remove('btn-primary');
                 btn.classList.add('btn-success');
                 btn.disabled = true;
-                
+
                 // 更新確認進度
                 const card = document.getElementById('task-card-' + taskId);
                 if (card) {
@@ -504,7 +504,7 @@ foreach ($teams as $team) {
                     badge.innerHTML = `<i class="fas fa-users me-1"></i>完成人數：${js.confirmed_count}/${js.total_members}`;
                   }
                 }
-                
+
                 showTempAlert(js.message, 'info');
               }
             } else {
@@ -514,13 +514,15 @@ foreach ($teams as $team) {
                 btn.classList.remove('btn-primary');
                 btn.classList.add('btn-success');
               } else {
-                showTempAlert('任務無法完成：' + (js.error||'unknown'), 'danger');
+                // 顯示詳細錯誤訊息
+                const errorMsg = js.message || js.error || 'unknown';
+                showTempAlert('任務無法完成：' + errorMsg, 'danger');
                 btn.disabled = false;
               }
             }
           })
-          .catch(err=>{ 
-            showTempAlert('網路錯誤', 'danger'); 
+          .catch(err=>{
+            showTempAlert('網路錯誤', 'danger');
             console.error(err);
             btn.disabled = false;
           });
