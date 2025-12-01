@@ -24,129 +24,131 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_date)) {
     $end_date = $default_end;
 }
 
-// 查詢點數紀錄 - 合併 points_logs 和 activities 兩個來源
-// 1. 從 points_logs 取得點數
+// 查詢活動紀錄中的點數
 $stmt = $pdo->prepare('
-    SELECT COALESCE(SUM(amount), 0) as total_points
-    FROM points_logs
-    WHERE user_id = ?
+    SELECT SUM(points_earned) as total_points
+    FROM activities 
+    WHERE user_id = ? 
+    AND activity_date BETWEEN ? AND ?
+');
+$stmt->execute([$user_id, $start_date, $end_date]);
+$activity_summary = $stmt->fetch();
+
+// 查詢團隊任務獲得的點數
+$stmt = $pdo->prepare('
+    SELECT SUM(amount) as total_task_points
+    FROM points_logs 
+    WHERE user_id = ? 
+    AND source = "team_task"
     AND DATE(created_at) BETWEEN ? AND ?
 ');
 $stmt->execute([$user_id, $start_date, $end_date]);
-$points_from_logs = (int)($stmt->fetch()['total_points'] ?? 0);
+$task_summary = $stmt->fetch();
 
-// 2. 從 activities 取得點數（舊資料，沒有記錄到 points_logs 的）
+// 查詢建築解鎖/升級扣除的點數
 $stmt = $pdo->prepare('
-    SELECT COALESCE(SUM(points_earned), 0) as total_points
-    FROM activities
-    WHERE user_id = ?
-    AND activity_date BETWEEN ? AND ?
-    AND activity_id NOT IN (SELECT COALESCE(related_id, 0) FROM points_logs WHERE user_id = ? AND source = "activity")
+    SELECT 
+        COALESCE(SUM(CASE WHEN source = "building_unlock" THEN cost ELSE 0 END), 0) as unlock_cost,
+        COALESCE(SUM(CASE WHEN source = "building_upgrade" THEN cost ELSE 0 END), 0) as upgrade_cost
+    FROM (
+        SELECT "building_unlock" as source, unlock_cost as cost, unlocked_at as created_at
+        FROM user_buildings ub
+        JOIN buildings b ON ub.building_id = b.building_id
+        WHERE ub.user_id = ? AND DATE(ub.unlocked_at) BETWEEN ? AND ?
+    ) as deductions
 ');
-$stmt->execute([$user_id, $start_date, $end_date, $user_id]);
-$points_from_activities = (int)($stmt->fetch()['total_points'] ?? 0);
-
-$total_points = $points_from_logs + $points_from_activities;
+$stmt->execute([$user_id, $start_date, $end_date]);
+$deduction_summary = $stmt->fetch();
 
 // 查詢建築相關獲得的金錢（解鎖 + 升級）
 $stmt = $pdo->prepare('
-    SELECT COALESCE(SUM(amount), 0) as total_building_money
-    FROM money_logs
-    WHERE user_id = ?
+    SELECT SUM(amount) as total_building_money
+    FROM money_logs 
+    WHERE user_id = ? 
+    AND source IN ("building_unlock", "building_upgrade")
     AND DATE(created_at) BETWEEN ? AND ?
 ');
 $stmt->execute([$user_id, $start_date, $end_date]);
 $building_summary = $stmt->fetch();
 
+$activity_points = (int)($activity_summary['total_points'] ?? 0);
+$task_points = (int)($task_summary['total_task_points'] ?? 0);
+$unlock_cost = (int)($deduction_summary['unlock_cost'] ?? 0);
+$upgrade_cost = (int)($deduction_summary['upgrade_cost'] ?? 0);
+$earned_points = $activity_points + $task_points - $unlock_cost - $upgrade_cost;
 $total_money = (int)($building_summary['total_building_money'] ?? 0);
 
-// 查詢每日點數明細 - 合併兩個來源
-// 從 points_logs
+// 查詢活動每日點數明細
 $stmt = $pdo->prepare('
-    SELECT
+    SELECT 
+        activity_date as record_date,
+        SUM(points_earned) as daily_points
+    FROM activities 
+    WHERE user_id = ? 
+    AND activity_date BETWEEN ? AND ?
+    GROUP BY activity_date
+');
+$stmt->execute([$user_id, $start_date, $end_date]);
+$activity_records = $stmt->fetchAll();
+
+// 查詢團隊任務每日點數明細
+$stmt = $pdo->prepare('
+    SELECT 
         DATE(created_at) as record_date,
         SUM(amount) as daily_points
-    FROM points_logs
-    WHERE user_id = ?
+    FROM points_logs 
+    WHERE user_id = ? 
+    AND source = "team_task"
     AND DATE(created_at) BETWEEN ? AND ?
     GROUP BY DATE(created_at)
 ');
 $stmt->execute([$user_id, $start_date, $end_date]);
-$points_log_records = $stmt->fetchAll();
+$task_records = $stmt->fetchAll();
 
-// 從 activities（舊資料）
+// 查詢建築解鎖每日扣除點數
 $stmt = $pdo->prepare('
-    SELECT
-        activity_date as record_date,
-        SUM(points_earned) as daily_points
-    FROM activities
-    WHERE user_id = ?
-    AND activity_date BETWEEN ? AND ?
-    AND activity_id NOT IN (SELECT COALESCE(related_id, 0) FROM points_logs WHERE user_id = ? AND source = "activity")
-    GROUP BY activity_date
+    SELECT 
+        DATE(unlocked_at) as record_date,
+        SUM(b.unlock_cost) as daily_deduct
+    FROM user_buildings ub
+    JOIN buildings b ON ub.building_id = b.building_id
+    WHERE ub.user_id = ? 
+    AND DATE(ub.unlocked_at) BETWEEN ? AND ?
+    GROUP BY DATE(unlocked_at)
 ');
-$stmt->execute([$user_id, $start_date, $end_date, $user_id]);
-$activity_records = $stmt->fetchAll();
+$stmt->execute([$user_id, $start_date, $end_date]);
+$unlock_deduct_records = $stmt->fetchAll();
+
+// 查詢建築升級每日扣除點數（從 money_logs 反推，升級費用 = 獲得金錢 * 2）
+$stmt = $pdo->prepare('
+    SELECT 
+        DATE(created_at) as record_date,
+        SUM(amount * 2) as daily_deduct
+    FROM money_logs 
+    WHERE user_id = ? 
+    AND source = "building_upgrade"
+    AND DATE(created_at) BETWEEN ? AND ?
+    GROUP BY DATE(created_at)
+');
+$stmt->execute([$user_id, $start_date, $end_date]);
+$upgrade_deduct_records = $stmt->fetchAll();
 
 // 查詢建築每日金錢明細
 $stmt = $pdo->prepare('
-    SELECT
+    SELECT 
         DATE(created_at) as record_date,
         SUM(amount) as daily_money
-    FROM money_logs
-    WHERE user_id = ?
+    FROM money_logs 
+    WHERE user_id = ? 
+    AND source IN ("building_unlock", "building_upgrade")
     AND DATE(created_at) BETWEEN ? AND ?
     GROUP BY DATE(created_at)
 ');
 $stmt->execute([$user_id, $start_date, $end_date]);
 $building_records = $stmt->fetchAll();
 
-// 查詢詳細的點數紀錄列表 - 合併 points_logs 和舊 activities 資料
-$stmt = $pdo->prepare('
-    SELECT log_id as id, amount, source, description, created_at
-    FROM points_logs
-    WHERE user_id = ?
-    AND DATE(created_at) BETWEEN ? AND ?
-
-    UNION ALL
-
-    SELECT activity_id as id, points_earned as amount, "activity" as source,
-           CONCAT("步數:", steps, " 運動:", time_minutes, "分 喝水:", water_ml, "ml") as description,
-           activity_date as created_at
-    FROM activities
-    WHERE user_id = ?
-    AND activity_date BETWEEN ? AND ?
-    AND activity_id NOT IN (SELECT COALESCE(related_id, 0) FROM points_logs WHERE user_id = ? AND source = "activity")
-
-    ORDER BY created_at DESC
-    LIMIT 100
-');
-$stmt->execute([$user_id, $start_date, $end_date, $user_id, $start_date, $end_date, $user_id]);
-$detailed_points_logs = $stmt->fetchAll();
-
-// 查詢詳細的金錢紀錄列表
-$stmt = $pdo->prepare('
-    SELECT log_id as id, amount, source, description, created_at
-    FROM money_logs
-    WHERE user_id = ?
-    AND DATE(created_at) BETWEEN ? AND ?
-    ORDER BY created_at DESC
-    LIMIT 100
-');
-$stmt->execute([$user_id, $start_date, $end_date]);
-$detailed_money_logs = $stmt->fetchAll();
-
-// 合併並按日期分組
+// 合併並按日期分組（扣除點數已計算在獲得點數中）
 $daily_data = [];
-// 合併 points_logs 的記錄
-foreach ($points_log_records as $r) {
-    $date = $r['record_date'];
-    if (!isset($daily_data[$date])) {
-        $daily_data[$date] = ['points' => 0, 'money' => 0];
-    }
-    $daily_data[$date]['points'] += (int)$r['daily_points'];
-}
-// 合併 activities 的舊記錄
 foreach ($activity_records as $r) {
     $date = $r['record_date'];
     if (!isset($daily_data[$date])) {
@@ -154,7 +156,27 @@ foreach ($activity_records as $r) {
     }
     $daily_data[$date]['points'] += (int)$r['daily_points'];
 }
-// 合併金錢記錄
+foreach ($task_records as $r) {
+    $date = $r['record_date'];
+    if (!isset($daily_data[$date])) {
+        $daily_data[$date] = ['points' => 0, 'money' => 0];
+    }
+    $daily_data[$date]['points'] += (int)$r['daily_points'];
+}
+foreach ($unlock_deduct_records as $r) {
+    $date = $r['record_date'];
+    if (!isset($daily_data[$date])) {
+        $daily_data[$date] = ['points' => 0, 'money' => 0];
+    }
+    $daily_data[$date]['points'] -= (int)$r['daily_deduct'];
+}
+foreach ($upgrade_deduct_records as $r) {
+    $date = $r['record_date'];
+    if (!isset($daily_data[$date])) {
+        $daily_data[$date] = ['points' => 0, 'money' => 0];
+    }
+    $daily_data[$date]['points'] -= (int)$r['daily_deduct'];
+}
 foreach ($building_records as $r) {
     $date = $r['record_date'];
     if (!isset($daily_data[$date])) {
@@ -165,6 +187,128 @@ foreach ($building_records as $r) {
 
 // 按日期降序排列
 krsort($daily_data);
+
+// 查詢詳細點數紀錄（運動獲得 + 團隊任務獲得 + 建築解鎖扣除）
+$detailed_points = [];
+
+// 運動獲得點數
+$stmt = $pdo->prepare('
+    SELECT 
+        activity_date as record_date,
+        created_at,
+        steps,
+        time_minutes,
+        water_ml,
+        points_earned
+    FROM activities 
+    WHERE user_id = ? 
+    AND activity_date BETWEEN ? AND ?
+    ORDER BY created_at DESC
+');
+$stmt->execute([$user_id, $start_date, $end_date]);
+$activity_details = $stmt->fetchAll();
+
+foreach ($activity_details as $r) {
+    $detailed_points[] = [
+        'datetime' => $r['created_at'],
+        'source' => '運動',
+        'description' => '步數:' . number_format($r['steps']) . ' / 運動:' . $r['time_minutes'] . '分鐘 / 喝水:' . number_format($r['water_ml']) . 'ml',
+        'points' => (int)$r['points_earned']
+    ];
+}
+
+// 團隊任務獲得點數
+$stmt = $pdo->prepare('
+    SELECT 
+        pl.created_at,
+        pl.amount,
+        pl.description
+    FROM points_logs pl
+    WHERE pl.user_id = ? 
+    AND pl.source = "team_task"
+    AND DATE(pl.created_at) BETWEEN ? AND ?
+    ORDER BY pl.created_at DESC
+');
+$stmt->execute([$user_id, $start_date, $end_date]);
+$task_details = $stmt->fetchAll();
+
+foreach ($task_details as $r) {
+    $detailed_points[] = [
+        'datetime' => $r['created_at'],
+        'source' => '團隊任務',
+        'description' => $r['description'] ?? '完成團隊任務',
+        'points' => (int)$r['amount']
+    ];
+}
+
+// 建築解鎖扣除點數
+$stmt = $pdo->prepare('
+    SELECT 
+        ub.unlocked_at as created_at,
+        b.name as building_name,
+        b.unlock_cost
+    FROM user_buildings ub
+    JOIN buildings b ON ub.building_id = b.building_id
+    WHERE ub.user_id = ? 
+    AND DATE(ub.unlocked_at) BETWEEN ? AND ?
+    ORDER BY ub.unlocked_at DESC
+');
+$stmt->execute([$user_id, $start_date, $end_date]);
+$unlock_details = $stmt->fetchAll();
+
+foreach ($unlock_details as $r) {
+    $detailed_points[] = [
+        'datetime' => $r['created_at'],
+        'source' => '解鎖建築',
+        'description' => '解鎖「' . $r['building_name'] . '」',
+        'points' => -(int)$r['unlock_cost']
+    ];
+}
+
+// 建築升級扣除點數（從 money_logs 反推）
+$stmt = $pdo->prepare('
+    SELECT 
+        ml.created_at,
+        ml.description,
+        ml.amount
+    FROM money_logs ml
+    WHERE ml.user_id = ? 
+    AND ml.source = "building_upgrade"
+    AND DATE(ml.created_at) BETWEEN ? AND ?
+    ORDER BY ml.created_at DESC
+');
+$stmt->execute([$user_id, $start_date, $end_date]);
+$upgrade_point_details = $stmt->fetchAll();
+
+foreach ($upgrade_point_details as $r) {
+    $detailed_points[] = [
+        'datetime' => $r['created_at'],
+        'source' => '升級建築',
+        'description' => $r['description'] ?? '升級建築',
+        'points' => -(int)($r['amount'] * 2)  // 升級費用 = 獲得金錢 * 2
+    ];
+}
+
+// 按時間降序排列
+usort($detailed_points, function($a, $b) {
+    return strtotime($b['datetime']) - strtotime($a['datetime']);
+});
+
+// 查詢詳細金錢紀錄
+$stmt = $pdo->prepare('
+    SELECT 
+        ml.created_at,
+        ml.source,
+        ml.description,
+        ml.amount
+    FROM money_logs ml
+    WHERE ml.user_id = ? 
+    AND ml.source IN ("building_unlock", "building_upgrade")
+    AND DATE(ml.created_at) BETWEEN ? AND ?
+    ORDER BY ml.created_at DESC
+');
+$stmt->execute([$user_id, $start_date, $end_date]);
+$detailed_money = $stmt->fetchAll();
 ?>
 <!doctype html>
 <html lang="zh-TW">
@@ -204,7 +348,7 @@ krsort($daily_data);
             <h4 class="card-title mb-4">
               <i class="fas fa-chart-line me-2" style="color: var(--primary);"></i>點數金錢紀錄查詢
             </h4>
-
+            
             <!-- 時間區間查詢表單 -->
             <form method="get" class="row g-3 mb-4">
               <div class="col-md-5">
@@ -236,7 +380,7 @@ krsort($daily_data);
               <div class="col-md-6">
                 <div class="card bg-primary text-white">
                   <div class="card-body text-center">
-                    <h3 class="mb-1"><?php echo number_format($total_points); ?></h3>
+                    <h3 class="mb-1"><?php echo number_format($earned_points); ?></h3>
                     <div><i class="fas fa-star me-1"></i>獲得點數</div>
                   </div>
                 </div>
@@ -268,7 +412,7 @@ krsort($daily_data);
                   <tr>
                     <td class="text-center"><?php echo htmlspecialchars($date); ?></td>
                     <td class="text-center">
-                      <span class="text-primary">
+                      <span class="<?php echo $data['points'] >= 0 ? 'text-primary' : 'text-danger'; ?>">
                         <i class="fas fa-star me-1"></i><?php echo number_format($data['points']); ?>
                       </span>
                     </td>
@@ -289,77 +433,98 @@ krsort($daily_data);
             <?php endif; ?>
 
             <!-- 詳細點數紀錄 -->
-            <?php if (!empty($detailed_points_logs)): ?>
             <h5 class="mb-3 mt-4"><i class="fas fa-history me-2"></i>詳細點數紀錄</h5>
+            <?php if (count($detailed_points) > 0): ?>
             <div class="table-responsive">
               <table class="table table-hover table-sm">
                 <thead>
                   <tr>
-                    <th>時間</th>
-                    <th>來源</th>
+                    <th class="text-center">時間</th>
+                    <th class="text-center">來源</th>
                     <th>說明</th>
-                    <th class="text-end">點數</th>
+                    <th class="text-center">點數</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <?php foreach ($detailed_points_logs as $log):
-                    $source_labels = [
-                      'activity' => '<span class="badge bg-primary">運動</span>',
-                      'team_bonus' => '<span class="badge bg-info">團隊獎勵</span>',
-                      'team_task' => '<span class="badge bg-warning text-dark">團隊任務</span>',
-                      'building_unlock' => '<span class="badge bg-danger">解鎖建築</span>',
-                      'building_upgrade' => '<span class="badge bg-purple" style="background-color: #6f42c1;">升級建築</span>',
-                      'other' => '<span class="badge bg-secondary">其他</span>',
-                    ];
-                    $source_label = $source_labels[$log['source']] ?? '<span class="badge bg-secondary">' . htmlspecialchars($log['source']) . '</span>';
-                  ?>
+                  <?php foreach ($detailed_points as $record): ?>
                   <tr>
-                    <td><?php echo date('m/d H:i', strtotime($log['created_at'])); ?></td>
-                    <td><?php echo $source_label; ?></td>
-                    <td><?php echo htmlspecialchars($log['description'] ?? '-'); ?></td>
-                    <td class="text-end <?php echo $log['amount'] >= 0 ? 'text-success' : 'text-danger'; ?>">
-                      <?php echo ($log['amount'] >= 0 ? '+' : '') . number_format($log['amount']); ?>
+                    <td class="text-center text-nowrap">
+                      <?php 
+                        $dt = new DateTime($record['datetime']);
+                        echo $dt->format('m/d H:i');
+                      ?>
+                    </td>
+                    <td class="text-center">
+                      <?php if ($record['source'] === '運動'): ?>
+                        <span class="badge bg-success"><i class="fas fa-running me-1"></i>運動</span>
+                      <?php elseif ($record['source'] === '團隊任務'): ?>
+                        <span class="badge bg-info"><i class="fas fa-users me-1"></i>團隊任務</span>
+                      <?php elseif ($record['source'] === '解鎖建築'): ?>
+                        <span class="badge bg-warning text-dark"><i class="fas fa-unlock me-1"></i>解鎖建築</span>
+                      <?php elseif ($record['source'] === '升級建築'): ?>
+                        <span class="badge bg-danger"><i class="fas fa-arrow-up me-1"></i>升級建築</span>
+                      <?php endif; ?>
+                    </td>
+                    <td><?php echo htmlspecialchars($record['description']); ?></td>
+                    <td class="text-center">
+                      <span class="<?php echo $record['points'] >= 0 ? 'text-primary' : 'text-danger'; ?> fw-bold">
+                        <?php echo $record['points'] >= 0 ? '+' : ''; ?><?php echo number_format($record['points']); ?>
+                      </span>
                     </td>
                   </tr>
                   <?php endforeach; ?>
                 </tbody>
               </table>
             </div>
+            <?php else: ?>
+            <div class="alert alert-secondary text-center">
+              <i class="fas fa-info-circle me-2"></i>此期間內沒有點數紀錄
+            </div>
             <?php endif; ?>
 
             <!-- 詳細金錢紀錄 -->
-            <?php if (!empty($detailed_money_logs)): ?>
-            <h5 class="mb-3 mt-4"><i class="fas fa-coins me-2" style="color: var(--success);"></i>詳細金錢紀錄</h5>
+            <h5 class="mb-3 mt-4"><i class="fas fa-coins me-2"></i>詳細金錢紀錄</h5>
+            <?php if (count($detailed_money) > 0): ?>
             <div class="table-responsive">
               <table class="table table-hover table-sm">
                 <thead>
                   <tr>
-                    <th>時間</th>
-                    <th>來源</th>
+                    <th class="text-center">時間</th>
+                    <th class="text-center">來源</th>
                     <th>說明</th>
-                    <th class="text-end">金額</th>
+                    <th class="text-center">金額</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <?php foreach ($detailed_money_logs as $log):
-                    $money_source_labels = [
-                      'building_unlock' => '<span class="badge bg-success">解鎖建築</span>',
-                      'building_upgrade' => '<span class="badge bg-info">升級建築</span>',
-                      'other' => '<span class="badge bg-secondary">其他</span>',
-                    ];
-                    $source_label = $money_source_labels[$log['source']] ?? '<span class="badge bg-secondary">' . htmlspecialchars($log['source']) . '</span>';
-                  ?>
+                  <?php foreach ($detailed_money as $record): ?>
                   <tr>
-                    <td><?php echo date('m/d H:i', strtotime($log['created_at'])); ?></td>
-                    <td><?php echo $source_label; ?></td>
-                    <td><?php echo htmlspecialchars($log['description'] ?? '-'); ?></td>
-                    <td class="text-end text-success">
-                      +<?php echo number_format($log['amount']); ?>
+                    <td class="text-center text-nowrap">
+                      <?php 
+                        $dt = new DateTime($record['created_at']);
+                        echo $dt->format('m/d H:i');
+                      ?>
+                    </td>
+                    <td class="text-center">
+                      <?php if ($record['source'] === 'building_unlock'): ?>
+                        <span class="badge bg-warning text-dark"><i class="fas fa-unlock me-1"></i>解鎖建築</span>
+                      <?php elseif ($record['source'] === 'building_upgrade'): ?>
+                        <span class="badge bg-danger"><i class="fas fa-arrow-up me-1"></i>升級建築</span>
+                      <?php endif; ?>
+                    </td>
+                    <td><?php echo htmlspecialchars($record['description'] ?? ''); ?></td>
+                    <td class="text-center">
+                      <span class="text-success fw-bold">
+                        +<?php echo number_format($record['amount']); ?>
+                      </span>
                     </td>
                   </tr>
                   <?php endforeach; ?>
                 </tbody>
               </table>
+            </div>
+            <?php else: ?>
+            <div class="alert alert-secondary text-center">
+              <i class="fas fa-info-circle me-2"></i>此期間內沒有金錢紀錄
             </div>
             <?php endif; ?>
 

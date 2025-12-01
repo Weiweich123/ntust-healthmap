@@ -82,17 +82,17 @@ $pending_team_invites = (int)$stmt->fetchColumn();
   <nav class="navbar navbar-expand-lg">
     <div class="container">
       <a class="navbar-brand" href="#">
-        <i class="fas fa-heartbeat me-2"></i>台科大健康任務地圖
+        <i class="fas fa-heartbeat me-2"></i><span class="d-none d-sm-inline">台科大健康任務地圖</span><span class="d-sm-none">健康地圖</span>
       </a>
-      <div class="d-flex align-items-center gap-3">
-        <a class="btn btn-outline-warning btn-sm" href="points_history.php" title="查詢點數金錢紀錄">
+      <div class="d-flex align-items-center gap-2 gap-lg-3">
+        <a class="btn btn-outline-warning btn-sm d-none d-lg-inline-flex" href="points_history.php" title="查詢點數金錢紀錄">
           <i class="fas fa-chart-line me-1"></i>點數及金錢紀錄查詢
         </a>
         <span class="badge bg-primary">
-          <i class="fas fa-star me-1"></i><?php echo (int)$user['points']; ?> 點
+          <i class="fas fa-star me-1"></i><?php echo (int)$user['points']; ?>
         </span>
         <span class="badge bg-success">
-          <i class="fas fa-coins me-1"></i><?php echo (int)$user['money']; ?> 元
+          <i class="fas fa-coins me-1"></i><?php echo (int)$user['money']; ?>
         </span>
 
         <!-- 使用者頭像下拉選單 -->

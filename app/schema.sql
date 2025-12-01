@@ -66,15 +66,25 @@ CREATE TABLE IF NOT EXISTS `activities` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `team_tasks` (
+  `task_id` INT AUTO_INCREMENT PRIMARY KEY,
   `team_id` INT NOT NULL,
   `title` VARCHAR(255) NOT NULL,
   `points` INT NOT NULL DEFAULT 10,
   `completed_by` INT DEFAULT NULL,
   `completed_at` TIMESTAMP NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_team_created` (`team_id`, `created_at`),
   CONSTRAINT `fk_tt_team` FOREIGN KEY (`team_id`) REFERENCES `teams`(`team_id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_tt_user` FOREIGN KEY (`completed_by`) REFERENCES `users`(`user_id`) ON DELETE SET NULL,
-  PRIMARY KEY (`team_id`,`created_at`)
+  CONSTRAINT `fk_tt_user` FOREIGN KEY (`completed_by`) REFERENCES `users`(`user_id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `task_confirmations` (
+  `task_id` INT NOT NULL,
+  `user_id` INT NOT NULL,
+  `confirmed_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`task_id`, `user_id`),
+  CONSTRAINT `fk_tc_task` FOREIGN KEY (`task_id`) REFERENCES `team_tasks`(`task_id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_tc_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`user_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `buildings` (`building_id`,`name`,`lat`,`lng`,`description`,`unlock_cost`,`reward_money`) VALUES
