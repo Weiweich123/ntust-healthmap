@@ -1,6 +1,6 @@
 [package]
 name = "weiweich123/ntust-healthmap"
-version = "0.9.24"
+version = "0.9.25"
 description = "NTUST Health Task Map - 台科大健康任務地圖"
 
 [dependencies]
