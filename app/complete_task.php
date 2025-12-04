@@ -96,8 +96,8 @@ try {
             ['title'=>'團隊騎車 5 公里','points'=>14]
         ];
         $pick = $pool[array_rand($pool)];
-        $ins = $pdo->prepare('INSERT INTO team_tasks (team_id,title,points) VALUES (?,?,?)');
-        $ins->execute([$team_id,$pick['title'],$pick['points']]);
+        $ins = $pdo->prepare('INSERT INTO team_tasks (team_id,title,points,created_by) VALUES (?,?,?,?)');
+        $ins->execute([$team_id,$pick['title'],$pick['points'],$user_id]);
         $new_task_id = (int)$pdo->lastInsertId();
 
         $pdo->commit();
