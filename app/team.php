@@ -132,8 +132,8 @@ foreach ($teams as $team) {
 
   while ($cnt < 3) {
     $pick = $taskPool[array_rand($taskPool)];
-    $ist = $pdo->prepare('INSERT INTO team_tasks (team_id,title,points) VALUES (?,?,?)');
-    $ist->execute([$team['id'], $pick['title'], $pick['points']]);
+    $ist = $pdo->prepare('INSERT INTO team_tasks (team_id,title,points,created_by) VALUES (?,?,?,?)');
+    $ist->execute([$team['id'], $pick['title'], $pick['points'], $user_id]);
     $cnt++;
   }
 
