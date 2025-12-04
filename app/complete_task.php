@@ -61,8 +61,8 @@ try {
     // 檢查是否所有成員都已確認
     if ($confirmed_count >= $total_members) {
         // 所有成員都確認了，完成任務並發放點數
-        $upd = $pdo->prepare('UPDATE team_tasks SET completed_by=?, completed_at=NOW() WHERE task_id=?');
-        $upd->execute([$user_id, $task_id]);
+        $upd = $pdo->prepare('UPDATE team_tasks SET completed_at=NOW() WHERE task_id=?');
+        $upd->execute([$task_id]);
 
         $pts = (int)$task['points'];
         $task_title = $task['title'];
