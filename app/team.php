@@ -339,7 +339,6 @@ foreach ($teams as $team) {
                         <div class="card-body d-flex flex-column">
                           <h6 class="card-title mb-2">
                             <i class="fas fa-clipboard-check me-2"></i><?php echo htmlspecialchars($t['title']); ?>
-                            <small class="text-muted">(ID: <?php echo $task_id; ?>)</small>
                           </h6>
                           <p class="mb-2 text-muted">
                             <i class="fas fa-trophy me-1"></i>獎勵：<strong><?php echo (int)$t['points']; ?></strong> 點
