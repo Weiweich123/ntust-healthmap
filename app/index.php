@@ -49,10 +49,13 @@ $pending_team_invites = (int)$stmt->fetchColumn();
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="assets/styles.css">
   <style>
-    /* 強制下拉選單顯示在地圖之上 */
+    /* 強制下拉選單顯示在地圖之上並固定位置 */
     .user-dropdown-menu {
       z-index: 99999 !important;
       position: absolute !important;
+      right: 0 !important;
+      left: auto !important;
+      transform: none !important;
       background-color: white !important;
       opacity: 1 !important;
       box-shadow: 0 8px 24px rgba(0,0,0,0.25) !important;
@@ -277,6 +280,7 @@ $pending_team_invites = (int)$stmt->fetchColumn();
       } else {
         html += `<hr>`;
         html += `<div>解鎖成本: <strong>${b.unlock_cost}</strong> 點</div>`;
+        html += `<div>解鎖可得金錢: <strong>${b.reward_money}</strong></div>`;
         html += `<div class="popup-actions"><button class="btn btn-sm btn-unlock" onclick="unlock(${b.id})">解鎖</button></div>`;
       }
       html += `</div>`;

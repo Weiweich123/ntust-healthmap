@@ -259,7 +259,6 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
                       <th class="text-center align-middle"><i class="fas fa-shoe-prints me-1"></i>步數</th>
                       <th class="text-center align-middle"><i class="fas fa-clock me-1"></i>運動時間</th>
                       <th class="text-center align-middle"><i class="fas fa-tint me-1"></i>喝水量</th>
-                      <th class="text-center align-middle"><i class="fas fa-star me-1"></i>點數獲得</th>
                       <th class="d-none edit-action-col text-center align-middle">操作</th>
                     </tr>
                   </thead>
@@ -273,7 +272,6 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
                         <td class="text-center align-middle"><?php echo number_format($act['steps']); ?></td>
                         <td class="text-center align-middle"><?php echo (int)$act['time_minutes']; ?> 分鐘</td>
                         <td class="text-center align-middle"><?php echo number_format($act['water_ml']); ?> ml</td>
-                        <td class="text-center align-middle"><?php echo number_format($act['points_earned']); ?> 點</td>
                         <td class="d-none edit-action-col text-center align-middle">
                           <a href="activity_history.php?edit=<?php echo $act['activity_id']; ?>&year=<?php echo urlencode($filter_year); ?>&month=<?php echo urlencode($filter_month); ?>&day=<?php echo urlencode($filter_day); ?>" class="btn btn-outline-warning btn-sm edit-btn">
                             <i class="fas fa-pen"></i>

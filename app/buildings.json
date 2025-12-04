@@ -10,7 +10,7 @@
   {"id":9,"name":"Teaching Building 2 (第二教學大樓)","lat":25.0120734,"lng":121.5408841,"description":"第二教學大樓","unlock_cost":16,"reward_money":8},
   {"id":10,"name":"Teaching Building 3 (第三教學大樓)","lat":25.0135006,"lng":121.5429062,"description":"第三教學大樓","unlock_cost":16,"reward_money":8},
   {"id":11,"name":"Teaching Building 4 (第四教學大樓)","lat":25.0138763,"lng":121.5417739,"description":"第四教學大樓","unlock_cost":16,"reward_money":8},
-  {"id":12,"name":"International Building (國際大樓)","lat":25.0123421,"lng":121.5395572,"description":"國際大樓","unlock_cost":24,"reward_money":12},
+  {"id":12,"name":"International Building (國際大樓)","lat":25.0117500,"lng":121.5398500,"description":"國際大樓","unlock_cost":24,"reward_money":12},
   {"id":13,"name":"Engineering Building 2 (工程二館)","lat":25.0125296,"lng":121.5407173,"description":"工程二館","unlock_cost":18,"reward_money":9},
   {"id":14,"name":"EE/CS Building (電資館)","lat":25.0118944,"lng":121.5413746,"description":"電資館","unlock_cost":18,"reward_money":9},
   {"id":15,"name":"Management Building (管理大樓)","lat":25.0123924,"lng":121.5412578,"description":"管理大樓","unlock_cost":20,"reward_money":10},
