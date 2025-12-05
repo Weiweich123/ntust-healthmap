@@ -92,10 +92,10 @@ $pending_team_invites = (int)$stmt->fetchColumn();
           <i class="fas fa-chart-line me-1"></i>點數及金錢紀錄查詢
         </a>
         <span class="badge bg-primary">
-          <i class="fas fa-star me-1"></i>點數 <?php echo (int)$user['points']; ?>
+          <i class="fas fa-star me-1"></i><?php echo (int)$user['points']; ?> 點
         </span>
         <span class="badge bg-success">
-          <i class="fas fa-coins me-1"></i>金錢 <?php echo (int)$user['money']; ?>
+          <i class="fas fa-coins me-1"></i><?php echo (int)$user['money']; ?> 元
         </span>
 
         <!-- 使用者頭像下拉選單 -->
