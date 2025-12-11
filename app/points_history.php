@@ -381,7 +381,7 @@ $detailed_money = $stmt->fetchAll();
                 <div class="card bg-primary text-white">
                   <div class="card-body text-center">
                     <h3 class="mb-1"><?php echo number_format($earned_points); ?></h3>
-                    <div><i class="fas fa-star me-1"></i>獲得點數</div>
+                    <div><i class="fas fa-star me-1"></i>點數總計</div>
                   </div>
                 </div>
               </div>
@@ -389,7 +389,7 @@ $detailed_money = $stmt->fetchAll();
                 <div class="card bg-success text-white">
                   <div class="card-body text-center">
                     <h3 class="mb-1"><?php echo number_format($total_money); ?></h3>
-                    <div><i class="fas fa-coins me-1"></i>獲得金錢</div>
+                    <div><i class="fas fa-coins me-1"></i>金錢總計</div>
                   </div>
                 </div>
               </div>
@@ -403,8 +403,8 @@ $detailed_money = $stmt->fetchAll();
                 <thead>
                   <tr>
                     <th class="text-center">日期</th>
-                    <th class="text-center">獲得點數</th>
-                    <th class="text-center">獲得金錢</th>
+                    <th class="text-center">點數總計</th>
+                    <th class="text-center">金錢總計</th>
                   </tr>
                 </thead>
                 <tbody>
